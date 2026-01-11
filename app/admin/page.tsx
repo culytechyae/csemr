@@ -104,6 +104,7 @@ export default function AdminDashboardPage() {
         { href: '/schools', label: 'View All Schools', icon: '🏫' },
         { href: '/schools/new', label: 'Create New School', icon: '➕' },
         { href: '/admin/schools/academic-years', label: 'Manage Academic Years', icon: '📅' },
+        { href: '/admin/schools/hl7-config', label: 'HL7 Configuration (All Schools)', icon: '⚙️' },
       ],
     },
     {

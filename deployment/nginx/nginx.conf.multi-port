@@ -1,0 +1,25 @@
+# NGINX Configuration - Multi-Port Load Balancing
+# Use this configuration if running separate PM2 processes on different ports
+# Instead of PM2 cluster mode
+
+# Upstream servers - Multiple PM2 processes on different ports
+upstream taaleem_backend {
+    # Load balancing method: least_conn (recommended)
+    least_conn;
+    
+    # Separate PM2 processes on different ports
+    # Each process runs independently
+    server localhost:5005 max_fails=3 fail_timeout=30s;
+    server localhost:5006 max_fails=3 fail_timeout=30s;
+    server localhost:5007 max_fails=3 fail_timeout=30s;
+    server localhost:5008 max_fails=3 fail_timeout=30s;
+    
+    # Keep connections alive
+    keepalive 32;
+    keepalive_requests 100;
+    keepalive_timeout 60s;
+}
+
+# Rest of configuration same as nginx.conf
+# Copy the rest from nginx.conf starting from "Rate limiting zones"
+

@@ -204,60 +204,156 @@ export const POST = requireAuth(async (req: NextRequest, user) => {
           where: { schoolId: school.id },
         });
 
-        // Use school config or defaults
-        const sendingApp = hl7Config?.sendingApplication || 'SchoolClinicEMR';
-        const sendingFac = hl7Config?.sendingFacility || school.code || 'SCHOOL_CLINIC';
-        const receivingApp = hl7Config?.receivingApplication || 'Rhapsody';
-        const receivingFac = hl7Config?.receivingFacility || 'MALAFFI';
-
-        const messageControlId = generateMessageControlId();
-        const builder = new HL7MessageBuilder({
-          messageControlId,
-          sendingApplication: `${sendingFac}^${sendingFac}`,
-          sendingFacility: `${sendingFac}^${sendingFac}`,
-          receivingApplication: `${receivingApp}^${receivingFac}`,
-          receivingFacility: receivingFac,
-        });
-
-        if (assessment) {
-          builder.buildORU_R01(student, visit, school, assessment);
+        // Check if HL7 is enabled for this school
+        if (hl7Config && !hl7Config.enabled) {
+          console.log(`HL7 is disabled for school ${school.id}`);
+          // Don't send HL7 message if disabled
         } else {
-          builder.buildADT_A08(student, visit, school);
-        }
+          // Determine message type
+          const messageType = assessment ? 'ORU_R01' : 'ADT_A08';
+          
+          // Check if auto-send is enabled and if this message type should be auto-sent
+          let shouldSend = true;
+          if (hl7Config) {
+            // Check autoSend flag
+            if (!hl7Config.autoSend) {
+              shouldSend = false;
+              console.log(`Auto-send is disabled for school ${school.id}`);
+            } else {
+              // Check if message type is in autoSendMessageTypes
+              if (hl7Config.autoSendMessageTypes) {
+                try {
+                  const allowedTypes = JSON.parse(hl7Config.autoSendMessageTypes);
+                  if (Array.isArray(allowedTypes) && !allowedTypes.includes(messageType)) {
+                    shouldSend = false;
+                    console.log(`Message type ${messageType} is not in auto-send list for school ${school.id}`);
+                  }
+                } catch (e) {
+                  // If parsing fails, allow sending (backward compatibility)
+                  console.warn('Failed to parse autoSendMessageTypes, allowing send');
+                }
+              }
+            }
+          }
 
-        const hl7Message = builder.build();
+          if (shouldSend) {
+            // Use school config or defaults
+            const sendingApp = hl7Config?.sendingApplication || school.code || 'SchoolClinicEMR';
+            const sendingFac = hl7Config?.sendingFacility || hl7Config?.facilityCode || school.code || 'SCHOOL_CLINIC';
+            const receivingApp = hl7Config?.receivingApplication || 'Rhapsody';
+            const receivingFac = hl7Config?.receivingFacility || hl7Config?.processingId || 'ADHIE';
+            const processingId = hl7Config?.environment === 'production' ? 'P' : 'T'; // 'P' for Production, 'T' for Test
+            const hl7Version = hl7Config?.hl7Version || '2.5.1';
+            const retryAttempts = hl7Config?.retryAttempts || 3;
 
-        // Save HL7 message
-        const hl7Record = await prisma.hL7Message.create({
-          data: {
-            messageType: assessment ? 'ORU' : 'ADT',
-            messageControlId,
-            studentId: student.id,
-            visitId: visit.id,
-            schoolId: school.id,
-            messageContent: hl7Message,
-            status: 'PENDING',
-          },
-        });
+            const messageControlId = generateMessageControlId();
+            const builder = new HL7MessageBuilder({
+              messageControlId,
+              sendingApplication: `${sendingFac}^${sendingFac}`,
+              sendingFacility: `${sendingFac}^${sendingFac}`,
+              receivingApplication: `${receivingApp}^${receivingFac}`,
+              receivingFacility: receivingFac,
+              processingId,
+              hl7Version,
+            });
 
-        // Send to Malaffi
-        const result = await sendHL7ToMalaffi(hl7Message, messageControlId);
-        if (result.success) {
-          await prisma.hL7Message.update({
-            where: { id: hl7Record.id },
-            data: {
-              status: 'SENT',
-              sentAt: new Date(),
-            },
-          });
-        } else {
-          await prisma.hL7Message.update({
-            where: { id: hl7Record.id },
-            data: {
-              status: 'FAILED',
-              errorMessage: result.error,
-            },
-          });
+            if (assessment) {
+              builder.buildORU_R01(student, visit, school, assessment);
+            } else {
+              builder.buildADT_A08(student, visit, school);
+            }
+
+            const hl7Message = builder.build();
+
+            // Save HL7 message
+            const hl7Record = await prisma.hL7Message.create({
+              data: {
+                messageType: assessment ? 'ORU' : 'ADT',
+                messageControlId,
+                studentId: student.id,
+                visitId: visit.id,
+                schoolId: school.id,
+                messageContent: hl7Message,
+                status: 'PENDING',
+              },
+            });
+
+            // Send to Malaffi with retry logic
+            let lastError: string | undefined;
+            let success = false;
+            
+            for (let attempt = 1; attempt <= retryAttempts; attempt++) {
+              const result = await sendHL7ToMalaffi(hl7Message, messageControlId, hl7Config?.environment || 'test');
+              
+              if (result.success) {
+                success = true;
+                await prisma.hL7Message.update({
+                  where: { id: hl7Record.id },
+                  data: {
+                    status: 'SENT',
+                    sentAt: new Date(),
+                  },
+                });
+                break;
+              } else {
+                lastError = result.error;
+                console.warn(`HL7 send attempt ${attempt}/${retryAttempts} failed: ${lastError}`);
+                
+                // Wait before retry (exponential backoff: 1s, 2s, 4s)
+                if (attempt < retryAttempts) {
+                  await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000));
+                }
+              }
+            }
+
+            if (!success) {
+              await prisma.hL7Message.update({
+                where: { id: hl7Record.id },
+                data: {
+                  status: 'FAILED',
+                  errorMessage: lastError || 'Unknown error',
+                  retryCount: retryAttempts,
+                },
+              });
+            }
+          } else {
+            // Save message but mark as PENDING (not sent)
+            const messageControlId = generateMessageControlId();
+            const sendingFac = hl7Config?.sendingFacility || hl7Config?.facilityCode || school.code || 'SCHOOL_CLINIC';
+            const receivingFac = hl7Config?.receivingFacility || hl7Config?.processingId || 'ADHIE';
+            const processingId = hl7Config?.environment === 'production' ? 'P' : 'T';
+            const hl7Version = hl7Config?.hl7Version || '2.5.1';
+
+            const builder = new HL7MessageBuilder({
+              messageControlId,
+              sendingApplication: `${sendingFac}^${sendingFac}`,
+              sendingFacility: `${sendingFac}^${sendingFac}`,
+              receivingApplication: hl7Config?.receivingApplication || 'Rhapsody',
+              receivingFacility: receivingFac,
+              processingId,
+              hl7Version,
+            });
+
+            if (assessment) {
+              builder.buildORU_R01(student, visit, school, assessment);
+            } else {
+              builder.buildADT_A08(student, visit, school);
+            }
+
+            const hl7Message = builder.build();
+
+            await prisma.hL7Message.create({
+              data: {
+                messageType: assessment ? 'ORU' : 'ADT',
+                messageControlId,
+                studentId: student.id,
+                visitId: visit.id,
+                schoolId: school.id,
+                messageContent: hl7Message,
+                status: 'PENDING',
+              },
+            });
+          }
         }
       }
     } catch (hl7Error) {

@@ -37,12 +37,20 @@ export default function SchoolDetailPage() {
     isActive: true,
   });
   const [hl7Config, setHl7Config] = useState({
+    facilityCode: '',
     sendingApplication: 'SchoolClinicEMR',
     sendingFacility: '',
     receivingApplication: 'Rhapsody',
     receivingFacility: 'MALAFFI',
+    processingId: 'ADHIE',
+    hl7Version: '2.5.1',
     autoSend: true,
     retryAttempts: 3,
+    validDoctorIds: '',
+    defaultDoctorId: '',
+    autoSendMessageTypes: '["ADT_A01","ADT_A04","ORU_R01"]',
+    environment: 'test' as 'test' | 'production',
+    enabled: true,
   });
 
   useEffect(() => {
@@ -94,45 +102,77 @@ export default function SchoolDetailPage() {
               if (hl7Res.ok) {
                 const hl7Data = await hl7Res.json();
                 setHl7Config({
-                  sendingApplication: hl7Data.sendingApplication || 'SchoolClinicEMR',
+                  facilityCode: hl7Data.facilityCode || data.code || '',
+                  sendingApplication: hl7Data.sendingApplication || data.code || 'SchoolClinicEMR',
                   sendingFacility: hl7Data.sendingFacility || data.code || '',
                   receivingApplication: hl7Data.receivingApplication || 'Rhapsody',
                   receivingFacility: hl7Data.receivingFacility || 'MALAFFI',
+                  processingId: hl7Data.processingId || 'ADHIE',
+                  hl7Version: hl7Data.hl7Version || '2.5.1',
                   autoSend: hl7Data.autoSend !== undefined ? hl7Data.autoSend : true,
                   retryAttempts: hl7Data.retryAttempts || 3,
+                  validDoctorIds: hl7Data.validDoctorIds || '',
+                  defaultDoctorId: hl7Data.defaultDoctorId || '',
+                  autoSendMessageTypes: hl7Data.autoSendMessageTypes || '["ADT_A01","ADT_A04","ORU_R01"]',
+                  environment: hl7Data.environment || 'test',
+                  enabled: hl7Data.enabled !== undefined ? hl7Data.enabled : true,
                 });
               } else {
                 // Set defaults if fetch fails
                 setHl7Config({
-                  sendingApplication: 'SchoolClinicEMR',
+                  facilityCode: data.code || '',
+                  sendingApplication: data.code || 'SchoolClinicEMR',
                   sendingFacility: data.code || '',
                   receivingApplication: 'Rhapsody',
                   receivingFacility: 'MALAFFI',
+                  processingId: 'ADHIE',
+                  hl7Version: '2.5.1',
                   autoSend: true,
                   retryAttempts: 3,
+                  validDoctorIds: '',
+                  defaultDoctorId: '',
+                  autoSendMessageTypes: '["ADT_A01","ADT_A04","ORU_R01"]',
+                  environment: 'test',
+                  enabled: true,
                 });
               }
             } catch (hl7Err) {
               console.error('HL7 config fetch error:', hl7Err);
               // Set defaults
               setHl7Config({
-                sendingApplication: 'SchoolClinicEMR',
+                facilityCode: data.code || '',
+                sendingApplication: data.code || 'SchoolClinicEMR',
                 sendingFacility: data.code || '',
                 receivingApplication: 'Rhapsody',
                 receivingFacility: 'MALAFFI',
+                processingId: 'ADHIE',
+                hl7Version: '2.5.1',
                 autoSend: true,
                 retryAttempts: 3,
+                validDoctorIds: '',
+                defaultDoctorId: '',
+                autoSendMessageTypes: '["ADT_A01","ADT_A04","ORU_R01"]',
+                environment: 'test',
+                enabled: true,
               });
             }
           } else {
             // Set defaults for non-admin users
             setHl7Config({
-              sendingApplication: 'SchoolClinicEMR',
+              facilityCode: data.code || '',
+              sendingApplication: data.code || 'SchoolClinicEMR',
               sendingFacility: data.code || '',
               receivingApplication: 'Rhapsody',
               receivingFacility: 'MALAFFI',
+              processingId: 'ADHIE',
+              hl7Version: '2.5.1',
               autoSend: true,
               retryAttempts: 3,
+              validDoctorIds: '',
+              defaultDoctorId: '',
+              autoSendMessageTypes: '["ADT_A01","ADT_A04","ORU_R01"]',
+              environment: 'test',
+              enabled: true,
             });
           }
           
@@ -429,87 +469,216 @@ export default function SchoolDetailPage() {
           </div>
 
           {userRole === 'ADMIN' && (
-            <div className="border-t border-gray-200 pt-6">
+            <div id="hl7-config" className="border-t border-gray-200 pt-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">HL7 Configuration</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Configure HL7 message settings for this school. Each school can have different HL7 codes.
+                Configure HL7 message settings for this school. Each school can have different HL7 codes and settings based on Malaffi requirements.
               </p>
               
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sending Application
-                  </label>
+              {/* Enable/Disable HL7 */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <label className="flex items-center">
                   <input
-                    type="text"
-                    value={hl7Config.sendingApplication}
-                    onChange={(e) => setHl7Config({ ...hl7Config, sendingApplication: e.target.value })}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    type="checkbox"
+                    checked={hl7Config.enabled}
+                    onChange={(e) => setHl7Config({ ...hl7Config, enabled: e.target.checked })}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                   />
-                </div>
+                  <span className="ml-2 text-sm font-medium text-gray-700">Enable HL7 for this school</span>
+                </label>
+                <p className="mt-1 text-xs text-gray-500 ml-6">When disabled, no HL7 messages will be generated for this school</p>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sending Facility
-                  </label>
-                  <input
-                    type="text"
-                    value={hl7Config.sendingFacility}
-                    onChange={(e) => setHl7Config({ ...hl7Config, sendingFacility: e.target.value })}
-                    placeholder={school.code}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">Usually the school code: {school.code}</p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Receiving Application
-                  </label>
-                  <input
-                    type="text"
-                    value={hl7Config.receivingApplication}
-                    onChange={(e) => setHl7Config({ ...hl7Config, receivingApplication: e.target.value })}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Receiving Facility
-                  </label>
-                  <input
-                    type="text"
-                    value={hl7Config.receivingFacility}
-                    onChange={(e) => setHl7Config({ ...hl7Config, receivingFacility: e.target.value })}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Retry Attempts
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    value={hl7Config.retryAttempts}
-                    onChange={(e) => setHl7Config({ ...hl7Config, retryAttempts: parseInt(e.target.value) || 3 })}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="flex items-center">
-                  <label className="flex items-center">
+              {/* MSH Segment Configuration */}
+              <div className="mb-6">
+                <h4 className="text-md font-semibold text-gray-800 mb-3">MSH Segment Configuration</h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Facility Code (DOH Code) *
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={hl7Config.autoSend}
-                      onChange={(e) => setHl7Config({ ...hl7Config, autoSend: e.target.checked })}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      type="text"
+                      value={hl7Config.facilityCode}
+                      onChange={(e) => setHl7Config({ ...hl7Config, facilityCode: e.target.value })}
+                      placeholder={school.code}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     />
-                    <span className="ml-2 text-sm text-gray-700">Automatically send HL7 messages</span>
-                  </label>
+                    <p className="mt-1 text-xs text-gray-500">DOH-assigned facility code (e.g., MF7163)</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Sending Application
+                    </label>
+                    <input
+                      type="text"
+                      value={hl7Config.sendingApplication}
+                      onChange={(e) => setHl7Config({ ...hl7Config, sendingApplication: e.target.value })}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Usually same as facility code</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Sending Facility
+                    </label>
+                    <input
+                      type="text"
+                      value={hl7Config.sendingFacility}
+                      onChange={(e) => setHl7Config({ ...hl7Config, sendingFacility: e.target.value })}
+                      placeholder={school.code}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Usually facility code or school code</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Receiving Application
+                    </label>
+                    <input
+                      type="text"
+                      value={hl7Config.receivingApplication}
+                      onChange={(e) => setHl7Config({ ...hl7Config, receivingApplication: e.target.value })}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Default: Rhapsody</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Receiving Facility
+                    </label>
+                    <input
+                      type="text"
+                      value={hl7Config.receivingFacility}
+                      onChange={(e) => setHl7Config({ ...hl7Config, receivingFacility: e.target.value })}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Default: MALAFFI</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Processing ID (MSH-6: Receiving Facility)
+                    </label>
+                    <input
+                      type="text"
+                      value={hl7Config.processingId}
+                      onChange={(e) => setHl7Config({ ...hl7Config, processingId: e.target.value })}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Used in MSH-6 as Receiving Facility (Default: ADHIE). MSH-11 Processing ID is always 'P' for Production.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      HL7 Version
+                    </label>
+                    <input
+                      type="text"
+                      value={hl7Config.hl7Version}
+                      onChange={(e) => setHl7Config({ ...hl7Config, hl7Version: e.target.value })}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Default: 2.5.1</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Environment
+                    </label>
+                    <select
+                      value={hl7Config.environment}
+                      onChange={(e) => setHl7Config({ ...hl7Config, environment: e.target.value as 'test' | 'production' })}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="test">Test</option>
+                      <option value="production">Production</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Doctor ID Configuration */}
+              <div className="mb-6">
+                <h4 className="text-md font-semibold text-gray-800 mb-3">Doctor ID Configuration</h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Valid Doctor IDs (Comma-separated)
+                    </label>
+                    <input
+                      type="text"
+                      value={hl7Config.validDoctorIds}
+                      onChange={(e) => setHl7Config({ ...hl7Config, validDoctorIds: e.target.value })}
+                      placeholder="GD18668,DOC001,DR001"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">List of doctor IDs registered in Modaqeq (comma-separated)</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Default Doctor ID
+                    </label>
+                    <input
+                      type="text"
+                      value={hl7Config.defaultDoctorId}
+                      onChange={(e) => setHl7Config({ ...hl7Config, defaultDoctorId: e.target.value })}
+                      placeholder="GD18668"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Used when provided ID is not in valid list</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Transmission Settings */}
+              <div className="mb-6">
+                <h4 className="text-md font-semibold text-gray-800 mb-3">Transmission Settings</h4>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Retry Attempts
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="10"
+                      value={hl7Config.retryAttempts}
+                      onChange={(e) => setHl7Config({ ...hl7Config, retryAttempts: parseInt(e.target.value) || 3 })}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="flex items-center">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={hl7Config.autoSend}
+                        onChange={(e) => setHl7Config({ ...hl7Config, autoSend: e.target.checked })}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Automatically send HL7 messages</span>
+                    </label>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Auto-Send Message Types (JSON array)
+                    </label>
+                    <input
+                      type="text"
+                      value={hl7Config.autoSendMessageTypes}
+                      onChange={(e) => setHl7Config({ ...hl7Config, autoSendMessageTypes: e.target.value })}
+                      placeholder='["ADT_A01","ADT_A04","ORU_R01"]'
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">JSON array of message types to auto-send: ADT_A01, ADT_A03, ADT_A04, ADT_A08, ORU_R01</p>
+                  </div>
                 </div>
               </div>
 

@@ -37,26 +37,57 @@ export async function POST(request: NextRequest) {
     const secret = generateMFASecret();
     
     // Encrypt the secret before storing
-    const encryptedSecret = await encryptData(secret);
+    let encryptedSecret: string;
+    try {
+      encryptedSecret = await encryptData(secret);
+    } catch (encryptError) {
+      console.error('Encryption error:', encryptError);
+      return NextResponse.json(
+        { error: 'Failed to encrypt MFA secret. Please check ENCRYPTION_KEY environment variable.' },
+        { status: 500 }
+      );
+    }
 
     // Generate QR code
-    const qrCode = await generateMFACode(secret, user.email);
+    let qrCode: string;
+    try {
+      qrCode = await generateMFACode(secret, user.email);
+    } catch (qrError) {
+      console.error('QR code generation error:', qrError);
+      return NextResponse.json(
+        { error: 'Failed to generate QR code' },
+        { status: 500 }
+      );
+    }
 
     // Store encrypted secret (but don't enable MFA yet - user needs to verify first)
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        mfaSecret: encryptedSecret,
-      },
-    });
+    try {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          mfaSecret: encryptedSecret,
+        },
+      });
+    } catch (dbError) {
+      console.error('Database update error:', dbError);
+      return NextResponse.json(
+        { error: 'Failed to save MFA secret to database' },
+        { status: 500 }
+      );
+    }
 
-    await logSecurityEvent(
-      'MFA_SETUP_INITIATED',
-      user.id,
-      'INFO',
-      `MFA setup initiated for ${user.email}`,
-      request
-    );
+    try {
+      await logSecurityEvent(
+        'MFA_SETUP_INITIATED',
+        user.id,
+        'INFO',
+        `MFA setup initiated for ${user.email}`,
+        request
+      );
+    } catch (logError) {
+      // Log error but don't fail the request
+      console.error('Failed to log security event:', logError);
+    }
 
     return NextResponse.json({
       success: true,
@@ -66,8 +97,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('MFA setup error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to setup MFA' },
+      { error: `Failed to setup MFA: ${errorMessage}` },
       { status: 500 }
     );
   }

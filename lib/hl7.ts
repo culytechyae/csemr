@@ -5,7 +5,9 @@ export interface HL7MessageOptions {
   sendingApplication: string;
   sendingFacility: string;
   receivingApplication: string;
-  receivingFacility: string;
+  receivingFacility: string; // MSH-6: Receiving Facility (e.g., "ADHIE")
+  processingId?: string; // MSH-11: Processing ID (default: 'P' for Production)
+  hl7Version?: string; // MSH-12: Version (default: '2.5.1')
 }
 
 export class HL7MessageBuilder {
@@ -44,6 +46,8 @@ export class HL7MessageBuilder {
     const timestamp = this.formatDateWithOffset(new Date(), '+0400');
     // Format: MSH|^~\&|SendingApp^SendingApp|SendingFac^SendingFac|ReceivingApp^ReceivingApp|ReceivingFac|Timestamp|Security|MessageType|ControlID|ProcessingID|VersionID
     // Based on sample: MSH|^~\&|MF7163^MF7163|MF7163^MF7163|Rhapsody^MALAFFI|ADHIE|20251217131150+0400||ADT^A01|adt-20251217131150|P|2.5.1
+    const processingId = this.options.processingId || 'P';
+    const hl7Version = this.options.hl7Version || '2.5.1';
     const msh = [
       'MSH',
       '^~\\&',
@@ -55,8 +59,8 @@ export class HL7MessageBuilder {
       '', // Security field (empty)
       messageType,
       this.options.messageControlId,
-      'P',
-      '2.5.1',
+      processingId,
+      hl7Version,
     ].join('|');
     this.addSegment(msh);
     return this;
@@ -428,9 +432,21 @@ export function generateMessageControlId(): string {
 
 export async function sendHL7ToMalaffi(
   message: string,
-  messageControlId: string
+  messageControlId: string,
+  environment: string = 'test'
 ): Promise<{ success: boolean; error?: string }> {
-  const malaffiUrl = process.env.MALAFFI_API_URL || 'https://api.malaffi.ae/hl7';
+  // Support both environment variable names
+  let malaffiUrl = process.env.MALAFFI_API_URL || process.env.MALAFFI_HL7_ENDPOINT;
+  
+  // If not set, use environment-based defaults
+  if (!malaffiUrl) {
+    if (environment === 'production') {
+      malaffiUrl = 'https://hl7.malaffi.ae/receive';
+    } else {
+      malaffiUrl = 'https://test-hl7.malaffi.ae/receive';
+    }
+  }
+  
   const apiKey = process.env.MALAFFI_API_KEY;
 
   if (!apiKey) {
@@ -438,6 +454,10 @@ export async function sendHL7ToMalaffi(
   }
 
   try {
+    // Add timeout to fetch request (30 seconds)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const response = await fetch(malaffiUrl, {
       method: 'POST',
       headers: {
@@ -446,16 +466,33 @@ export async function sendHL7ToMalaffi(
         'X-Message-Control-ID': messageControlId,
       },
       body: message,
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      const errorText = await response.text();
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch (e) {
+        errorText = `HTTP ${response.status} ${response.statusText}`;
+      }
       return { success: false, error: `HTTP ${response.status}: ${errorText}` };
     }
 
     return { success: true };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    if (error.name === 'AbortError') {
+      return { success: false, error: 'Request timeout after 30 seconds' };
+    }
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+      return { success: false, error: `Connection failed: ${error.message}. Check MALAFFI_API_URL and network connectivity.` };
+    }
+    if (error.message && error.message.includes('fetch failed')) {
+      return { success: false, error: `Network error: ${error.message}. Check MALAFFI_API_URL (${malaffiUrl}) and network connectivity.` };
+    }
+    return { success: false, error: error.message || 'Unknown error occurred' };
   }
 }
 

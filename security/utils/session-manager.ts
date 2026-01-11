@@ -6,7 +6,7 @@
 import { prisma } from '@/lib/prisma';
 import { generateToken } from '@/lib/auth';
 
-const SESSION_TIMEOUT_MINUTES = 30; // 30 minutes of inactivity
+const SESSION_TIMEOUT_MINUTES = 15; // 15 minutes of inactivity
 const MAX_CONCURRENT_SESSIONS = 3; // Maximum 3 concurrent sessions per user
 
 export interface SessionInfo {

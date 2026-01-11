@@ -1,0 +1,50 @@
+========================================
+  Taaleem Clinic Management System
+  Production Server Access Information
+========================================
+
+Server Status: RUNNING ✓
+
+Server IP Address: 10.24.0.10
+Port: 5005
+
+ACCESS URLs:
+-----------
+Local Access:
+  http://localhost:5005
+
+Intranet Access (for users on the same network):
+  http://10.24.0.10:5005
+
+HOW TO ACCESS:
+-------------
+1. Open any web browser on a device connected to the same network
+2. Navigate to: http://10.24.0.10:5005
+3. Login with your credentials
+
+FIREWALL:
+---------
+If users cannot access the server:
+- Ensure Windows Firewall allows port 5005
+- Run this command as Administrator:
+  New-NetFirewallRule -DisplayName "Taaleem EMR - Port 5005" -Direction Inbound -LocalPort 5005 -Protocol TCP -Action Allow
+
+TROUBLESHOOTING:
+---------------
+- If you cannot access: Check if server is running (netstat -ano | findstr :5005)
+- If connection refused: Check firewall settings
+- If page not loading: Check server logs for errors
+
+SERVER MANAGEMENT:
+-----------------
+Stop Server: 
+  Get-Process -Name node | Where-Object {$_.MainWindowTitle -eq ''} | Stop-Process
+
+Start Server:
+  cd C:\EMR
+  npm start
+
+========================================
+Last Updated: December 2024
+========================================
+

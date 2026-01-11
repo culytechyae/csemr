@@ -299,18 +299,32 @@ model HL7Message {
 model SchoolHL7Config {
   id                   String   @id @default(cuid())
   schoolId             String   @unique
+  // MSH Segment Configuration
+  facilityCode         String   // DOH-assigned facility code (e.g., MF7163)
   sendingApplication   String   @default("SchoolClinicEMR")
-  sendingFacility      String // Usually school code
+  sendingFacility      String // Usually facility code or school code
   receivingApplication String   @default("Rhapsody")
   receivingFacility    String   @default("MALAFFI")
+  processingId         String   @default("ADHIE") // Processing ID for MSH segment
+  hl7Version           String   @default("2.5.1") // HL7 version
+  // Transmission Settings
   autoSend             Boolean  @default(true)
   retryAttempts        Int      @default(3)
+  // Doctor ID Configuration
+  validDoctorIds       String?  @db.Text // Comma-separated list of valid doctor IDs
+  defaultDoctorId      String?  // Default doctor ID to use if provided ID is invalid
+  // Message Type Settings (JSON string for which types to auto-send)
+  autoSendMessageTypes String?  @db.Text // JSON array: ["ADT_A01", "ADT_A04", "ORU_R01"]
+  // Environment Settings
+  environment          String   @default("test") // "test" or "production"
+  enabled              Boolean  @default(true) // Enable/disable HL7 for this school
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
   school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   @@index([schoolId])
+  @@index([enabled])
 }
 
 model PasswordHistory {

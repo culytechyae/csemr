@@ -112,11 +112,17 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Determine if using HTTPS
+    const protocol = request.headers.get('x-forwarded-proto') || 
+                     (request.url.startsWith('https://') ? 'https' : 'http');
+    const isSecure = protocol === 'https';
+    
     response.cookies.set('auth-token', session.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isSecure, // Only secure over HTTPS
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
     });
 
     return response;

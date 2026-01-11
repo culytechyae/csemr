@@ -93,8 +93,9 @@ export async function POST(request: NextRequest) {
       // Set auth cookie
       response.cookies.set('auth-token', session.token, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
+        secure: request.headers.get('x-forwarded-proto') === 'https' || request.url.startsWith('https://'),
         sameSite: 'lax',
+        path: '/',
         maxAge: 60 * 60 * 24 * 7, // 7 days
       });
 

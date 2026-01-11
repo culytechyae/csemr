@@ -35,10 +35,12 @@ export const POST = requireAuth(async (req: NextRequest, user) => {
       });
 
       return {
-        sendingApp: hl7Config?.sendingApplication || 'SchoolClinicEMR',
-        sendingFac: hl7Config?.sendingFacility || school?.code || 'SCHOOL_CLINIC',
+        sendingApp: hl7Config?.sendingApplication || school?.code || 'SchoolClinicEMR',
+        sendingFac: hl7Config?.sendingFacility || hl7Config?.facilityCode || school?.code || 'SCHOOL_CLINIC',
         receivingApp: hl7Config?.receivingApplication || 'Rhapsody',
-        receivingFac: hl7Config?.receivingFacility || 'MALAFFI',
+        receivingFac: hl7Config?.receivingFacility || hl7Config?.processingId || 'ADHIE', // MSH-6: Use processingId as receivingFacility per Malaffi spec
+        processingId: 'P', // MSH-11: Always 'P' for Production
+        hl7Version: hl7Config?.hl7Version || '2.5.1',
       };
     };
 
@@ -71,6 +73,8 @@ export const POST = requireAuth(async (req: NextRequest, user) => {
         sendingFacility: `${config.sendingFac}^${config.sendingFac}`,
         receivingApplication: `${config.receivingApp}^${config.receivingFac}`,
         receivingFacility: config.receivingFac,
+        processingId: config.processingId,
+        hl7Version: config.hl7Version,
       });
 
       builder.buildADT_A04(student, student.school);
@@ -114,6 +118,8 @@ export const POST = requireAuth(async (req: NextRequest, user) => {
       sendingFacility: `${config.sendingFac}^${config.sendingFac}`,
       receivingApplication: `${config.receivingApp}^${config.receivingFac}`,
       receivingFacility: config.receivingFac,
+      processingId: config.processingId,
+      hl7Version: config.hl7Version,
     });
 
     switch (type) {

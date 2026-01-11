@@ -17,6 +17,7 @@ export default function ImportStudentsPage() {
   const [schools, setSchools] = useState<School[]>([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [academicYear, setAcademicYear] = useState('');
+  const [academicYears, setAcademicYears] = useState<string[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [importResults, setImportResults] = useState<any>(null);
   const [userRole, setUserRole] = useState<string>('');
@@ -45,6 +46,34 @@ export default function ImportStudentsPage() {
           if (school?.currentAcademicYear) {
             setAcademicYear(school.currentAcademicYear);
           }
+        }
+      });
+
+    // Fetch available academic years from system settings
+    fetch('/api/settings/academic-years')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.academicYears && Array.isArray(data.academicYears)) {
+          setAcademicYears(data.academicYears);
+          // Set default academic year if not already set
+          if (!academicYear && data.defaultAcademicYear) {
+            setAcademicYear(data.defaultAcademicYear);
+          }
+        }
+      })
+      .catch((error) => {
+        console.error('Error fetching academic years:', error);
+        // Fallback: Generate academic years client-side
+        const currentYear = new Date().getFullYear();
+        const fallbackYears: string[] = [];
+        for (let i = -5; i <= 5; i++) {
+          const startYear = currentYear + i;
+          const endYear = startYear + 1;
+          fallbackYears.push(`${startYear}-${endYear}`);
+        }
+        setAcademicYears(fallbackYears.reverse());
+        if (!academicYear) {
+          setAcademicYear(fallbackYears[0]);
         }
       });
   }, []);
@@ -184,14 +213,22 @@ export default function ImportStudentsPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Academic Year *</label>
-              <input
-                type="text"
+              <select
                 value={academicYear}
                 onChange={(e) => setAcademicYear(e.target.value)}
-                placeholder="e.g., 2024-2025"
                 required
-                className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
+                className="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="">Select Academic Year</option>
+                {academicYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+              {academicYears.length === 0 && (
+                <p className="mt-1 text-xs text-gray-500">Loading academic years...</p>
+              )}
             </div>
           </div>
 

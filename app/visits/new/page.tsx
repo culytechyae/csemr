@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Breadcrumb from '@/components/Breadcrumb';
+import PainScaleSelector from '@/components/PainScaleSelector';
 
 interface Student {
   id: string;
@@ -444,6 +445,19 @@ export default function NewVisitPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Pain Scale Selector */}
+          <div className="border-t border-gray-200 pt-6">
+            <PainScaleSelector
+              value={formData.assessment.painScale}
+              onChange={(score) =>
+                setFormData({
+                  ...formData,
+                  assessment: { ...formData.assessment, painScale: score.toString() },
+                })
+              }
+            />
           </div>
 
           <div>

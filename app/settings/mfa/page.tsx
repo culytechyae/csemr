@@ -53,8 +53,10 @@ export default function MFASettingsPage() {
         setSecret(data.secret);
         setSuccess(data.message);
       } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to setup MFA');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
+        const errorMessage = errorData.error || 'Failed to setup MFA';
+        setError(errorMessage);
+        console.error('MFA setup error:', errorMessage);
       }
     } catch (error) {
       setError('An error occurred while setting up MFA');
