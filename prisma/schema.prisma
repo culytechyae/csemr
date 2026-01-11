@@ -1,0 +1,420 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  CLINIC_MANAGER
+  NURSE
+  DOCTOR
+  STAFF
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum BloodType {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+  UNKNOWN
+}
+
+enum VisitType {
+  ROUTINE_CHECKUP
+  ILLNESS
+  INJURY
+  VACCINATION
+  EMERGENCY
+  FOLLOW_UP
+}
+
+enum HL7MessageStatus {
+  PENDING
+  SENT
+  FAILED
+  ACKNOWLEDGED
+}
+
+model User {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  passwordHash        String
+  firstName           String
+  lastName            String
+  role                UserRole
+  schoolId            String?
+  isActive            Boolean   @default(true)
+  // Security fields
+  passwordChangedAt   DateTime?
+  passwordExpiresAt   DateTime?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  lastLoginIp         String?
+  mfaEnabled          Boolean   @default(false)
+  mfaSecret           String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  school          School?              @relation(fields: [schoolId], references: [id])
+  sessions        Session[]
+  clinicalVisits  ClinicalVisit[]
+  assessments     ClinicalAssessment[]
+  healthRecords   HealthRecord[]
+  passwordHistory PasswordHistory[]
+  loginAttempts   LoginAttempt[]
+  emailLogs       EmailLog[]
+
+  @@index([email])
+  @@index([schoolId])
+  @@index([isActive])
+}
+
+model Session {
+  id             String   @id @default(cuid())
+  userId         String
+  token          String   @unique
+  expiresAt      DateTime
+  ipAddress      String?
+  userAgent      String?
+  isActive       Boolean  @default(true)
+  lastActivityAt DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
+model School {
+  id                  String   @id @default(cuid())
+  name                String
+  code                String   @unique
+  address             String
+  phone               String
+  email               String?
+  principalName       String
+  currentAcademicYear String? // e.g., "2024-2025"
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  users         User[]
+  students      Student[]
+  visits        ClinicalVisit[]
+  healthRecords HealthRecord[]
+  hl7Messages   HL7Message[]
+  hl7Config     SchoolHL7Config?
+
+  @@index([code])
+}
+
+model Student {
+  id                String    @id @default(cuid())
+  schoolId          String
+  studentId         String // School-specific student ID
+  academicYear      String // e.g., "2024-2025"
+  firstName         String
+  lastName          String
+  dateOfBirth       DateTime
+  gender            Gender
+  nationality       String?
+  bloodType         BloodType @default(UNKNOWN)
+  parentName        String
+  parentPhone       String
+  parentEmail       String?
+  emergencyContact  String
+  emergencyPhone    String
+  address           String?
+  allergies         String?
+  chronicConditions String?
+  medications       String?
+  isActive          Boolean   @default(true)
+  enrolledAt        DateTime  @default(now())
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  school        School               @relation(fields: [schoolId], references: [id])
+  visits        ClinicalVisit[]
+  assessments   ClinicalAssessment[]
+  healthRecords HealthRecord[]
+  hl7Messages   HL7Message[]
+
+  @@unique([schoolId, studentId, academicYear])
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([academicYear])
+}
+
+model ClinicalVisit {
+  id               String    @id @default(cuid())
+  studentId        String
+  schoolId         String
+  visitDate        DateTime  @default(now())
+  visitType        VisitType
+  chiefComplaint   String?
+  notes            String?
+  diagnosis        String?
+  treatment        String?
+  followUpRequired Boolean   @default(false)
+  followUpDate     DateTime?
+  createdBy        String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  student     Student             @relation(fields: [studentId], references: [id])
+  school      School              @relation(fields: [schoolId], references: [id])
+  creator     User                @relation(fields: [createdBy], references: [id])
+  assessment  ClinicalAssessment?
+  hl7Messages HL7Message[]
+
+  @@index([studentId])
+  @@index([schoolId])
+  @@index([visitDate])
+}
+
+model HealthRecord {
+  id                              String   @id @default(cuid())
+  studentId                       String
+  schoolId                        String
+  height                          Float? // in cm
+  weight                          Float? // in kg
+  bmi                             Float?
+  colorBlindness                  String? // Normal/Abnormal
+  visionTestingPerformed          Boolean? // Yes/No
+  visionTestingNotPerformedReason String?
+  correctiveLenses                String? // None, Glasses, Contact lenses, Surgical correction, Other
+  correctiveLensesOtherReason     String?
+  rightEye                        String? // Vision acuity (6/3, 6/6, etc.)
+  leftEye                         String? // Vision acuity
+  rightEyeWithCorrection          String? // Vision acuity with correction
+  leftEyeWithCorrection           String? // Vision acuity with correction
+  visionScreeningResult           String? // Normal/Abnormal
+  recordedBy                      String
+  recordedAt                      DateTime @default(now())
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+
+  student  Student @relation(fields: [studentId], references: [id])
+  school   School  @relation(fields: [schoolId], references: [id])
+  recorder User    @relation(fields: [recordedBy], references: [id])
+
+  @@index([studentId])
+  @@index([schoolId])
+  @@index([recordedAt])
+}
+
+model ClinicalAssessment {
+  id                              String   @id @default(cuid())
+  visitId                         String   @unique
+  studentId                       String
+  temperature                     Float?
+  bloodPressureSystolic           Int?
+  bloodPressureDiastolic          Int?
+  heartRate                       Int?
+  respiratoryRate                 Int?
+  oxygenSaturation                Float?
+  height                          Float? // in cm
+  weight                          Float? // in kg
+  bmi                             Float?
+  painScale                       Int? // 0-10
+  generalAppearance               String?
+  skinCondition                   String?
+  eyes                            String?
+  ears                            String?
+  throat                          String?
+  cardiovascular                  String?
+  respiratory                     String?
+  abdomen                         String?
+  neurological                    String?
+  otherFindings                   String?
+  // Health Record fields
+  colorBlindness                  String?
+  visionTestingPerformed          Boolean?
+  visionTestingNotPerformedReason String?
+  correctiveLenses                String?
+  correctiveLensesOtherReason     String?
+  rightEye                        String?
+  leftEye                         String?
+  rightEyeWithCorrection          String?
+  leftEyeWithCorrection           String?
+  visionScreeningResult           String?
+  createdBy                       String
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+
+  visit   ClinicalVisit @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  student Student       @relation(fields: [studentId], references: [id])
+  creator User          @relation(fields: [createdBy], references: [id])
+
+  @@index([studentId])
+  @@index([visitId])
+}
+
+model HL7Message {
+  id               String           @id @default(cuid())
+  messageType      String // ADT, ORU, etc.
+  messageControlId String           @unique
+  studentId        String?
+  visitId          String?
+  schoolId         String
+  messageContent   String           @db.Text
+  status           HL7MessageStatus @default(PENDING)
+  sentAt           DateTime?
+  acknowledgedAt   DateTime?
+  errorMessage     String?          @db.Text
+  retryCount       Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  student Student?       @relation(fields: [studentId], references: [id])
+  visit   ClinicalVisit? @relation(fields: [visitId], references: [id])
+  school  School         @relation(fields: [schoolId], references: [id])
+
+  @@index([status])
+  @@index([schoolId])
+  @@index([messageControlId])
+  @@index([createdAt])
+}
+
+model SchoolHL7Config {
+  id                   String   @id @default(cuid())
+  schoolId             String   @unique
+  sendingApplication   String   @default("SchoolClinicEMR")
+  sendingFacility      String // Usually school code
+  receivingApplication String   @default("Rhapsody")
+  receivingFacility    String   @default("MALAFFI")
+  autoSend             Boolean  @default(true)
+  retryAttempts        Int      @default(3)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId])
+}
+
+model PasswordHistory {
+  id           String   @id @default(cuid())
+  userId       String
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model LoginAttempt {
+  id            String   @id @default(cuid())
+  userId        String?
+  email         String
+  success       Boolean
+  ipAddress     String?
+  userAgent     String?
+  failureReason String?
+  createdAt     DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([userId])
+  @@index([success])
+  @@index([createdAt])
+  @@index([ipAddress])
+}
+
+model SecurityEvent {
+  id          String    @id @default(cuid())
+  eventType   String // LOGIN_SUCCESS, LOGIN_FAILURE, PASSWORD_CHANGE, ACCOUNT_LOCKED, etc.
+  userId      String?
+  severity    String // LOW, MEDIUM, HIGH, CRITICAL
+  description String    @db.Text
+  ipAddress   String?
+  userAgent   String?
+  metadata    String?   @db.Text // JSON string for additional data
+  resolved    Boolean   @default(false)
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  createdAt   DateTime  @default(now())
+
+  @@index([eventType])
+  @@index([userId])
+  @@index([severity])
+  @@index([resolved])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String
+  changes    String?  @db.Text
+  ipAddress  String?
+  userAgent  String?
+  severity   String   @default("INFO") // INFO, WARNING, ERROR, CRITICAL
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([severity])
+  @@index([action])
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+  BOUNCED
+  DELIVERED
+}
+
+model EmailLog {
+  id           String      @id @default(cuid())
+  to           String
+  subject      String
+  body         String      @db.Text
+  html         String?     @db.Text
+  status       EmailStatus @default(PENDING)
+  templateType String? // WELCOME, PASSWORD_RESET, PARENT_VISIT_NOTIFICATION, etc.
+  sentBy       String? // userId who triggered the email
+  sentAt       DateTime?
+  deliveredAt  DateTime?
+  errorMessage String?     @db.Text
+  retryCount   Int         @default(0)
+  metadata     String?     @db.Text // JSON string for additional data
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  sentByUser User? @relation(fields: [sentBy], references: [id], onDelete: SetNull)
+
+  @@index([to])
+  @@index([status])
+  @@index([templateType])
+  @@index([sentBy])
+  @@index([createdAt])
+  @@index([sentAt])
+}

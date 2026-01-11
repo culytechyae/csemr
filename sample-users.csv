@@ -1,0 +1,4 @@
+email,password,firstName,lastName,role,schoolCode,isActive
+nurse1@school1.local,password123,Nurse,One,NURSE,SCH001,true
+doctor1@school1.local,password123,Doctor,One,DOCTOR,SCH001,true
+staff1@school1.local,password123,Staff,One,STAFF,SCH001,true
