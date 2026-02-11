@@ -11,3 +11,51 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* Print styles for Health Analytics Dashboard */
+@media print {
+  body {
+    background-color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  aside,
+  header,
+  .print\\:hidden {
+    display: none !important;
+  }
+
+  .print\\:p-0 {
+    padding: 0 !important;
+  }
+
+  .print\\:mb-4 {
+    margin-bottom: 1rem !important;
+  }
+
+  .print\\:block {
+    display: block !important;
+  }
+
+  main {
+    margin-left: 0 !important;
+    padding: 1rem !important;
+  }
+
+  .min-h-screen {
+    min-height: auto !important;
+  }
+
+  .recharts-wrapper {
+    page-break-inside: avoid;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+}

@@ -5,8 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start -p 5005 -H 0.0.0.0",
-    "start:prod": "cross-env NODE_ENV=production next start -p 5005 -H 0.0.0.0",
+    "start": "next start -p 8000 -H 0.0.0.0",
+    "start:prod": "cross-env NODE_ENV=production next start -p 8000 -H 0.0.0.0",
     "start:watchdog": "node scripts/watchdog.js",
     "start:pm2": "pm2 start deployment/pm2/ecosystem.config.js",
     "start:pm2:cluster": "pm2 start deployment/pm2/ecosystem.config.js -i max",
@@ -31,6 +31,7 @@
     "bcryptjs": "^2.4.3",
     "date-fns": "^3.0.6",
     "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.563.0",
     "next": "^14.0.4",
     "nodemailer": "^7.0.11",
     "otplib": "^12.0.1",

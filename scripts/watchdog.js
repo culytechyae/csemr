@@ -15,6 +15,7 @@ const MAX_RESTARTS = 10;
 const RESTART_WINDOW = 60000; // 1 minute
 const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
 const SECURITY_CHECK_INTERVAL = 300000; // 5 minutes
+const PORT = process.env.PORT || '8000';
 
 // Ensure logs directory exists
 if (!fs.existsSync(LOG_DIR)) {
@@ -58,7 +59,7 @@ async function healthCheck() {
     const http = require('http');
     
     return new Promise((resolve) => {
-      const req = http.get('http://localhost:5005/api/health', { timeout: 5000 }, (res) => {
+      const req = http.get(`http://localhost:${PORT}/api/health`, { timeout: 5000 }, (res) => {
         if (res.statusCode === 200) {
           log('Health check passed', 'INFO');
           resolve(true);
@@ -189,7 +190,7 @@ function startServer() {
   const env = {
     ...process.env,
     NODE_ENV: process.env.NODE_ENV || 'production',
-    PORT: process.env.PORT || '5005',
+    PORT: process.env.PORT || '8000',
   };
 
   // Start the server process

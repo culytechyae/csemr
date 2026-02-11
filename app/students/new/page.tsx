@@ -28,6 +28,9 @@ export default function NewStudentPage() {
     gender: 'MALE',
     nationality: '',
     bloodType: 'UNKNOWN',
+    grade: '',
+    homeroom: '',
+    studentEmiratesId: '',
     parentName: '',
     parentPhone: '',
     parentEmail: '',
@@ -278,6 +281,36 @@ export default function NewStudentPage() {
                 <option value="O_POSITIVE">O+</option>
                 <option value="O_NEGATIVE">O-</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Grade</label>
+              <input
+                type="text"
+                value={formData.grade}
+                onChange={(e) => setFormData({ ...formData, grade: e.target.value })}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Homeroom</label>
+              <input
+                type="text"
+                value={formData.homeroom}
+                onChange={(e) => setFormData({ ...formData, homeroom: e.target.value })}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Student Emirates ID</label>
+              <input
+                type="text"
+                value={formData.studentEmiratesId}
+                onChange={(e) => setFormData({ ...formData, studentEmiratesId: e.target.value })}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              />
             </div>
 
             <div>

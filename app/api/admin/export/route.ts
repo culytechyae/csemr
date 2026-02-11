@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import * as XLSX from 'xlsx';
+import { logPortableMediaAccess, logDataAccess } from '@/security/audit/audit-logger';
 
 // Helper function to convert data to CSV
 function convertToCSV(data: any[]): string {
@@ -299,6 +300,34 @@ export const POST = requireRole('ADMIN')(
           { status: 400 }
         );
       }
+
+      // Log data export and portable media copy
+      await logDataAccess(
+        user.id,
+        exportType,
+        `${exportType}_export`,
+        'DATA_EXPORT',
+        req,
+        {
+          format,
+          recordCount: data.length,
+          filename: `${filename}.${fileExtension}`,
+        }
+      ).catch(err => console.error('Failed to log data access:', err));
+
+      // Log as portable media copy (exported data could be saved to portable media)
+      await logPortableMediaAccess(
+        user.id,
+        'COPY',
+        `${format.toUpperCase()}_FILE`,
+        req,
+        {
+          exportType,
+          filename: `${filename}.${fileExtension}`,
+          recordCount: data.length,
+          fileSize: typeof content === 'string' ? content.length : (content as Buffer).length,
+        }
+      ).catch(err => console.error('Failed to log portable media access:', err));
 
       // Return file download
       return new NextResponse(content as BodyInit, {

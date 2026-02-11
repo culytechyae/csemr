@@ -38,6 +38,21 @@ interface PreviousVisit {
   };
 }
 
+interface StudentSummary {
+  healthSummary?: {
+    allergies?: string;
+    chronicConditions?: string;
+    medications?: string;
+  };
+  statistics?: {
+    totalVisits?: number;
+  };
+  student?: {
+    grade?: string | null;
+    homeroom?: string | null;
+  };
+}
+
 export default function NewVisitPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -49,6 +64,9 @@ export default function NewVisitPage() {
   const [previousVisits, setPreviousVisits] = useState<PreviousVisit[]>([]);
   const [selectedVisit, setSelectedVisit] = useState<PreviousVisit | null>(null);
   const [loadingVisits, setLoadingVisits] = useState(false);
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
+  const [studentSummary, setStudentSummary] = useState<StudentSummary | null>(null);
   const [formData, setFormData] = useState({
     studentId: '',
     schoolId: '',
@@ -119,6 +137,26 @@ export default function NewVisitPage() {
     fetch('/api/schools')
       .then((res) => res.json())
       .then((data) => setSchools(data));
+
+    // Check for query parameters (when navigating from students page)
+    const urlParams = new URLSearchParams(window.location.search);
+    const studentIdParam = urlParams.get('studentId');
+    const schoolIdParam = urlParams.get('schoolId');
+    
+    if (schoolIdParam) {
+      setSelectedSchoolId(schoolIdParam);
+      setFormData((prev) => ({ ...prev, schoolId: schoolIdParam }));
+      // Load students for this school
+      fetch(`/api/students?schoolId=${schoolIdParam}`)
+        .then((res) => res.json())
+        .then((studentData) => {
+          setStudents(studentData);
+          // If studentId is provided, select it
+          if (studentIdParam && studentData.find((s: Student) => s.id === studentIdParam)) {
+            setFormData((prev) => ({ ...prev, studentId: studentIdParam, schoolId: schoolIdParam }));
+          }
+        });
+    }
   }, []);
 
   useEffect(() => {
@@ -126,6 +164,10 @@ export default function NewVisitPage() {
       fetch(`/api/students?schoolId=${selectedSchoolId}`)
         .then((res) => res.json())
         .then((data) => setStudents(data));
+      // Clear student selection when school changes
+      setFormData((prev) => ({ ...prev, studentId: '', schoolId: selectedSchoolId }));
+      setStudentSearchQuery('');
+      setIsStudentDropdownOpen(false);
     }
   }, [selectedSchoolId]);
 
@@ -146,9 +188,22 @@ export default function NewVisitPage() {
           setPreviousVisits([]);
           setLoadingVisits(false);
         });
+
+      // Fetch richer student snapshot (allergies, summary, etc.)
+      fetch(`/api/students/${formData.studentId}/summary`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.error) {
+            setStudentSummary(data);
+          } else {
+            setStudentSummary(null);
+          }
+        })
+        .catch(() => setStudentSummary(null));
     } else {
       setPreviousVisits([]);
       setSelectedVisit(null);
+      setStudentSummary(null);
     }
   }, [formData.studentId]);
 
@@ -231,9 +286,26 @@ export default function NewVisitPage() {
     return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
+  // Filter students based on search query (by ID or name)
+  const filteredStudents = students.filter((student) => {
+    if (!studentSearchQuery.trim()) return true;
+    const query = studentSearchQuery.toLowerCase().trim();
+    const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
+    const studentId = student.studentId.toLowerCase();
+    return fullName.includes(query) || studentId.includes(query);
+  });
+
+  const selectedStudent = students.find((s) => s.id === formData.studentId);
+
+  const handleStudentSelect = (studentId: string) => {
+    setFormData({ ...formData, studentId });
+    setStudentSearchQuery('');
+    setIsStudentDropdownOpen(false);
+  };
+
   return (
     <Layout>
-      <div className="max-w-7xl">
+      <div className="max-w-7xl mx-auto">
         <Breadcrumb
           items={[
             { label: 'Dashboard', href: '/dashboard' },
@@ -241,11 +313,35 @@ export default function NewVisitPage() {
             { label: 'New Assessment' },
           ]}
         />
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">New Assessment</h1>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-6 space-y-6">
+        <div className="flex items-start justify-between mb-5 mt-2 gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">New Assessment</h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Structured clinical visit entry with vitals, complaint, and plan.
+            </p>
+          </div>
+          {selectedStudent && (
+            <div className="hidden sm:flex flex-col items-end text-right">
+              <p className="text-sm font-semibold text-gray-900">
+                {selectedStudent.firstName} {selectedStudent.lastName}
+              </p>
+              <p className="text-xs text-slate-500">
+                ID {selectedStudent.studentId}
+                {studentSummary?.student?.grade && ` • Grade ${studentSummary.student.grade}`}
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)] gap-6 items-start">
+          {/* Assessment Form */}
+          <div>
+            <form
+              id="assessment-form"
+              onSubmit={handleSubmit}
+              className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-8"
+            >
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-gray-700">School</label>
@@ -273,20 +369,70 @@ export default function NewVisitPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700">Student</label>
-              <select
-                value={formData.studentId}
-                onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                required
-                disabled={!selectedSchoolId}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
-              >
-                <option value="">Select a student</option>
-                {students.map((student) => (
-                  <option key={student.id} value={student.id}>
-                    {student.firstName} {student.lastName} ({student.studentId})
-                  </option>
-                ))}
-              </select>
+              <div className="mt-1 relative">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={isStudentDropdownOpen || !selectedStudent ? studentSearchQuery : `${selectedStudent.firstName} ${selectedStudent.lastName} (${selectedStudent.studentId})`}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setStudentSearchQuery(value);
+                      setIsStudentDropdownOpen(true);
+                      if (!value) {
+                        setFormData({ ...formData, studentId: '' });
+                      }
+                    }}
+                    onFocus={() => {
+                      setIsStudentDropdownOpen(true);
+                      // If a student is selected, clear it to allow searching
+                      if (selectedStudent) {
+                        setStudentSearchQuery('');
+                        setFormData({ ...formData, studentId: '' });
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay closing to allow click events
+                      setTimeout(() => setIsStudentDropdownOpen(false), 200);
+                    }}
+                    placeholder={selectedStudent ? "Click to search..." : "Search by student ID or name..."}
+                    required
+                    disabled={!selectedSchoolId}
+                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+                {isStudentDropdownOpen && selectedSchoolId && (
+                  <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none">
+                    {filteredStudents.length === 0 ? (
+                      <div className="px-4 py-2 text-sm text-gray-500">No students found</div>
+                    ) : (
+                      filteredStudents.map((student) => (
+                        <div
+                          key={student.id}
+                          onClick={() => handleStudentSelect(student.id)}
+                          className={`px-4 py-2 cursor-pointer hover:bg-blue-50 ${
+                            formData.studentId === student.id ? 'bg-blue-50' : ''
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-gray-900">
+                              {student.firstName} {student.lastName}
+                            </span>
+                            <span className="text-sm text-gray-500">({student.studentId})</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+                {!selectedSchoolId && (
+                  <p className="mt-1 text-sm text-gray-500">Please select a school first</p>
+                )}
+              </div>
             </div>
 
             <div>
@@ -317,12 +463,16 @@ export default function NewVisitPage() {
             </div>
           </div>
 
+          {/* Vitals Grid */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Vital Signs</label>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-gray-600">Temperature (°C)</label>
-                <input
+            <label className="block text-sm font-semibold text-gray-900 mb-2">Vital Signs</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40">
+                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                  Temperature
+                </label>
+                <div className="mt-1 relative">
+                  <input
                   type="number"
                   step="0.1"
                   value={formData.assessment.temperature}
@@ -332,12 +482,18 @@ export default function NewVisitPage() {
                       assessment: { ...formData.assessment, temperature: e.target.value },
                     })
                   }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm"
+                  className="block w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
+                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-slate-400">
+                    °C
+                  </span>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs text-gray-600">Blood Pressure (Systolic/Diastolic)</label>
-                <div className="flex space-x-2">
+              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40">
+                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                  Blood Pressure
+                </label>
+                <div className="mt-1 flex gap-2">
                   <input
                     type="number"
                     placeholder="Systolic"
@@ -351,7 +507,7 @@ export default function NewVisitPage() {
                         },
                       })
                     }
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm"
+                    className="block w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                   <input
                     type="number"
@@ -366,13 +522,17 @@ export default function NewVisitPage() {
                         },
                       })
                     }
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm"
+                    className="block w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
+                <p className="mt-1 text-[11px] text-slate-400">mmHg</p>
               </div>
-              <div>
-                <label className="block text-xs text-gray-600">Heart Rate (bpm)</label>
-                <input
+              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40">
+                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                  Heart Rate
+                </label>
+                <div className="mt-1 relative">
+                  <input
                   type="number"
                   value={formData.assessment.heartRate}
                   onChange={(e) =>
@@ -381,12 +541,19 @@ export default function NewVisitPage() {
                       assessment: { ...formData.assessment, heartRate: e.target.value },
                     })
                   }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm"
+                  className="block w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
+                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-slate-400">
+                    bpm
+                  </span>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs text-gray-600">Respiratory Rate (/min)</label>
-                <input
+              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40">
+                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                  Respiratory Rate
+                </label>
+                <div className="mt-1 relative">
+                  <input
                   type="number"
                   value={formData.assessment.respiratoryRate}
                   onChange={(e) =>
@@ -395,12 +562,19 @@ export default function NewVisitPage() {
                       assessment: { ...formData.assessment, respiratoryRate: e.target.value },
                     })
                   }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm"
+                  className="block w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-14 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
+                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-slate-400">
+                    / min
+                  </span>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs text-gray-600">Oxygen Saturation (%)</label>
-                <input
+              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40">
+                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                  Oxygen Saturation
+                </label>
+                <div className="mt-1 relative">
+                  <input
                   type="number"
                   step="0.1"
                   value={formData.assessment.oxygenSaturation}
@@ -410,12 +584,18 @@ export default function NewVisitPage() {
                       assessment: { ...formData.assessment, oxygenSaturation: e.target.value },
                     })
                   }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm"
+                  className="block w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
+                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-slate-400">
+                    %
+                  </span>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs text-gray-600">Height (cm) / Weight (kg)</label>
-                <div className="flex space-x-2">
+              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40 sm:col-span-2 xl:col-span-1">
+                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
+                  Height / Weight
+                </label>
+                <div className="mt-1 flex gap-2">
                   <input
                     type="number"
                     step="0.1"
@@ -427,7 +607,7 @@ export default function NewVisitPage() {
                         assessment: { ...formData.assessment, height: e.target.value },
                       })
                     }
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm"
+                    className="block w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                   <input
                     type="number"
@@ -440,15 +620,58 @@ export default function NewVisitPage() {
                         assessment: { ...formData.assessment, weight: e.target.value },
                       })
                     }
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm"
+                    className="block w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
+                <p className="mt-1 text-[11px] text-slate-400">cm / kg</p>
               </div>
             </div>
           </div>
 
+          {/* Chief Complaint */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-900 mb-1">Chief Complaint</label>
+            <textarea
+              rows={3}
+              value={formData.chiefComplaint}
+              onChange={(e) => setFormData({ ...formData, chiefComplaint: e.target.value })}
+              placeholder="Describe the primary reason for today's visit..."
+              className="mt-1 block w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+            <div className="mt-3 flex flex-wrap gap-2">
+              {['Headache', 'Fever', 'Abdominal pain', 'Injury during sports', 'Respiratory symptoms'].map(
+                (suggestion) => (
+                  <button
+                    key={suggestion}
+                    type="button"
+                    onClick={() =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        chiefComplaint: prev.chiefComplaint
+                          ? `${prev.chiefComplaint.trim()}${prev.chiefComplaint.trim().endsWith('.') ? '' : '.'} ${suggestion}`
+                          : suggestion,
+                      }))
+                    }
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-blue-50 hover:border-blue-200"
+                  >
+                    <span>＋</span>
+                    {suggestion}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+
           {/* Pain Scale Selector */}
-          <div className="border-t border-gray-200 pt-6">
+          <div className="border-t border-gray-200 pt-5">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <h2 className="text-sm font-semibold text-gray-900">Pain Scale</h2>
+                <p className="text-[11px] text-slate-500">
+                  Tap the face that best matches the patient&apos;s pain level.
+                </p>
+              </div>
+            </div>
             <PainScaleSelector
               value={formData.assessment.painScale}
               onChange={(score) =>
@@ -460,24 +683,48 @@ export default function NewVisitPage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Diagnosis</label>
-            <textarea
-              value={formData.diagnosis}
-              onChange={(e) => setFormData({ ...formData, diagnosis: e.target.value })}
-              rows={3}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+          {/* Diagnosis & Plan */}
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-semibold text-gray-900">Diagnosis</label>
+                <select
+                  className="ml-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (!value) return;
+                    setFormData((prev) => ({
+                      ...prev,
+                      diagnosis: prev.diagnosis ? `${prev.diagnosis}\n${value}` : value,
+                    }));
+                  }}
+                >
+                  <option value="">Common diagnoses…</option>
+                  <option value="Upper respiratory tract infection">Upper respiratory tract infection</option>
+                  <option value="Viral fever">Viral fever</option>
+                  <option value="Tension-type headache">Tension-type headache</option>
+                  <option value="Minor musculoskeletal injury">Minor musculoskeletal injury</option>
+                  <option value="Allergic reaction">Allergic reaction</option>
+                </select>
+              </div>
+              <textarea
+                value={formData.diagnosis}
+                onChange={(e) => setFormData({ ...formData, diagnosis: e.target.value })}
+                rows={3}
+                className="mt-1 block w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Treatment</label>
-            <textarea
-              value={formData.treatment}
-              onChange={(e) => setFormData({ ...formData, treatment: e.target.value })}
-              rows={3}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
+            <div>
+              <label className="block text-sm font-semibold text-gray-900">Plan / Treatment</label>
+              <textarea
+                value={formData.treatment}
+                onChange={(e) => setFormData({ ...formData, treatment: e.target.value })}
+                rows={3}
+                className="mt-1 block w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
           </div>
 
           <div>
@@ -492,7 +739,7 @@ export default function NewVisitPage() {
 
           {/* Health Record Fields - Auto-populated from latest health record */}
           <div className="border-t border-gray-200 pt-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Vision & Health Record Data</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Vision &amp; Health Record Data</h2>
             <p className="text-sm text-gray-500 mb-4">
               These fields are automatically populated from the latest health record. You can modify them if needed.
             </p>
@@ -729,7 +976,7 @@ export default function NewVisitPage() {
             </div>
           </div>
 
-          <div className="flex items-center">
+          <div className="flex flex-wrap items-center gap-3">
             <input
               type="checkbox"
               checked={formData.followUpRequired}
@@ -742,7 +989,7 @@ export default function NewVisitPage() {
                 type="date"
                 value={formData.followUpDate}
                 onChange={(e) => setFormData({ ...formData, followUpDate: e.target.value })}
-                className="ml-4 border border-gray-300 rounded-md shadow-sm py-2 px-3 text-sm"
+                className="border border-slate-200 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             )}
           </div>
@@ -766,7 +1013,7 @@ export default function NewVisitPage() {
             )}
           </div>
 
-          <div className="flex justify-end space-x-3">
+          <div className="flex justify-end space-x-3 pt-2">
             <button
               type="button"
               onClick={() => router.back()}
@@ -785,78 +1032,69 @@ export default function NewVisitPage() {
         </form>
           </div>
 
-          {/* Previous Visits Sidebar */}
-          <div className="lg:col-span-1">
-            {formData.studentId ? (
-              <div className="bg-white shadow rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                  Previous Visits
-                  {loadingVisits && <span className="text-sm text-gray-500 ml-2">Loading...</span>}
-                </h2>
-                {previousVisits.length === 0 && !loadingVisits ? (
-                  <p className="text-sm text-gray-500">No previous visits found</p>
-                ) : (
-                  <div className="space-y-3 max-h-[calc(100vh-200px)] overflow-y-auto">
-                    {previousVisits.map((visit) => (
-                      <div
-                        key={visit.id}
-                        onClick={() => setSelectedVisit(visit)}
-                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                          selectedVisit?.id === visit.id
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900">
+          {/* Patient Snapshot Sidebar */}
+          <div className="lg:col-span-1 space-y-4 lg:sticky lg:top-20">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">Patient Snapshot</h2>
+                  <p className="text-[11px] text-slate-500">Allergies, conditions &amp; quick history</p>
+                </div>
+              </div>
+
+              {/* Allergies card */}
+              <div
+                className={`rounded-xl border px-3.5 py-3 mb-3 ${
+                  studentSummary?.healthSummary?.allergies &&
+                  studentSummary.healthSummary.allergies !== 'None recorded'
+                    ? 'border-rose-200 bg-rose-50/70'
+                    : 'border-slate-200 bg-slate-50/60'
+                }`}
+              >
+                <p className="text-xs font-semibold text-slate-700 mb-1">Allergies</p>
+                <p className="text-xs text-slate-700">
+                  {studentSummary?.healthSummary?.allergies || 'No allergies recorded'}
+                </p>
+              </div>
+
+              {/* Recent history timeline */}
+              <div>
+                <p className="text-xs font-semibold text-slate-700 mb-2">Recent History</p>
+                {formData.studentId ? (
+                  previousVisits.length === 0 && !loadingVisits ? (
+                    <p className="text-xs text-slate-400">No previous visits found</p>
+                  ) : (
+                    <ol className="relative border-l border-slate-200 space-y-3 max-h-[320px] overflow-y-auto">
+                      {previousVisits.slice(0, 3).map((visit) => (
+                        <li key={visit.id} className="ml-3 pl-3">
+                          <div className="absolute -left-1.5 mt-1 h-2.5 w-2.5 rounded-full bg-blue-500" />
+                          <button
+                            type="button"
+                            onClick={() => setSelectedVisit(visit)}
+                            className="w-full text-left"
+                          >
+                            <p className="text-[11px] font-semibold text-slate-700">
                               {formatVisitType(visit.visitType)}
                             </p>
-                            <p className="text-xs text-gray-500">{formatDate(visit.visitDate)}</p>
-                          </div>
-                        </div>
-                        {visit.chiefComplaint && (
-                          <p className="text-xs text-gray-600 mb-1 truncate">
-                            <span className="font-medium">Complaint:</span> {visit.chiefComplaint}
-                          </p>
-                        )}
-                        {visit.diagnosis && (
-                          <p className="text-xs text-gray-600 mb-1 truncate">
-                            <span className="font-medium">Diagnosis:</span> {visit.diagnosis}
-                          </p>
-                        )}
-                        {visit.assessment && (
-                          <div className="mt-2 pt-2 border-t border-gray-200">
-                            <div className="grid grid-cols-2 gap-1 text-xs text-gray-500">
-                              {visit.assessment.temperature && (
-                                <div>Temp: {visit.assessment.temperature}°C</div>
-                              )}
-                              {visit.assessment.heartRate && (
-                                <div>HR: {visit.assessment.heartRate} bpm</div>
-                              )}
-                              {visit.assessment.bloodPressureSystolic && (
-                                <div>
-                                  BP: {visit.assessment.bloodPressureSystolic}/
-                                  {visit.assessment.bloodPressureDiastolic || '--'}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        <p className="text-xs text-gray-400 mt-2">
-                          By: {visit.creator.firstName} {visit.creator.lastName}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+                            <p className="text-[10px] text-slate-400">{formatDate(visit.visitDate)}</p>
+                            {visit.chiefComplaint && (
+                              <p className="mt-0.5 text-[11px] text-slate-600 line-clamp-2">
+                                {visit.chiefComplaint}
+                              </p>
+                            )}
+                          </button>
+                        </li>
+                      ))}
+                      {loadingVisits && (
+                        <li className="ml-3 pl-3 text-[11px] text-slate-400">Loading history…</li>
+                      )}
+                    </ol>
+                  )
+                ) : (
+                  <p className="text-xs text-slate-400">Select a student to view history</p>
                 )}
               </div>
-            ) : (
-              <div className="bg-white shadow rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Previous Visits</h2>
-                <p className="text-sm text-gray-500">Select a student to view previous visits</p>
-              </div>
-            )}
+            </div>
 
             {/* Visit Preview Modal */}
             {selectedVisit && (
@@ -939,6 +1177,16 @@ export default function NewVisitPage() {
           </div>
         </div>
       </div>
+
+      {/* Floating Save Assessment button */}
+      <button
+        type="submit"
+        form="assessment-form"
+        disabled={loading}
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60"
+      >
+        {loading ? 'Saving…' : 'Save Assessment'}
+      </button>
     </Layout>
   );
 }

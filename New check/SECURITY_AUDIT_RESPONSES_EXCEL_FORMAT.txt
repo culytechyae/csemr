@@ -1,0 +1,84 @@
+SECURITY ASSESSMENT RESPONSES - COPY TO EXCEL COLUMN "Response"
+
+Question 1 -> Fully Compliant. Security awareness program documented in security/policies/01-SECURITY_AWARENESS_PROGRAM.md (quarterly campaigns, annual training, phishing simulations, training records).
+
+Question 2 -> Partially Compliant (Policy Documented / Infrastructure Evidence Pending). Physical/environmental security guidance documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 3). Provide facility/IT evidence (access logs, visitor logs, CCTV, environmental monitoring).
+
+Question 3 -> Fully Compliant. Comprehensive access control implemented with JWT authentication, RBAC, school-based data isolation. See References/SECURITY_ASSESSMENT_REPORT.md sections 1 and 8.
+
+Question 4 -> Partially Compliant. User registration functionality exists but formal documented procedures for onboarding/offboarding may need enhancement. Technical implementation present.
+
+Question 5 -> Fully Compliant. Role-based access control with 5 roles, school-based data isolation, principle of least privilege enforced. See References/SECURITY_ASSESSMENT_REPORT.md section 8.
+
+Question 6 -> Fully Compliant. Strong password enforcement (min 8 chars, uppercase, lowercase, numbers, special chars), bcrypt encryption (12 rounds), 90-day expiration, password history prevention (last 5). See md_files/security/COMPLIANCE.md AUTH-002 through AUTH-004.
+
+Question 7 -> Fully Compliant. Portable/removable media policy documented in security/policies/02-PORTABLE_MEDIA_SECURITY.md. Technical logging: data exports are logged as portable media COPY via app/api/admin/export/route.ts and security/audit/audit-logger.ts (logPortableMediaAccess).
+
+Question 8 -> Fully Compliant. Teleworking/remote access policy documented in security/policies/03-TELEWORKING_REMOTE_ACCESS_SECURITY.md. Remote access logging integrated in app/api/auth/login/route.ts and app/api/auth/mfa/verify/route.ts via logRemoteAccess.
+
+Question 9 -> Fully Compliant. Access review processes available through admin interface. Audit logging tracks all access and privilege changes. See References/SECURITY_ASSESSMENT_REPORT.md section 2.
+
+Question 10 -> Fully Compliant. Network access controlled through authentication/authorization middleware. All API endpoints protected with requireAuth() and requireRole(). See lib/auth.ts, References/SECURITY_ASSESSMENT_REPORT.md section 8.
+
+Question 11 -> Fully Compliant. Multi-factor authentication (MFA) implemented using TOTP. MFA can be enabled per user. HTTPS/TLS enforced via HSTS. See References/SECURITY_ASSESSMENT_REPORT.md section 1.
+
+Question 12 -> Partially Compliant (Policy Documented / Infrastructure Evidence Pending). Wireless security requirements documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 4). Provide AP/WLC configuration evidence.
+
+Question 13 -> Partially Compliant (Policy Documented / Infrastructure Evidence Pending). Guest Wi‑Fi segregation requirements documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 4.2). Provide VLAN/firewall rule evidence.
+
+Question 14 -> Partially Compliant (Policy Documented / Infrastructure Evidence Pending). Wireless encryption standards documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 4.2.1). Provide WPA3/WPA2‑Enterprise + AES evidence.
+
+Question 15 -> Fully Compliant. Session timeout enforced (30 minutes inactivity), automatic session timeout, secure login/logout with session revocation. See md_files/security/COMPLIANCE.md AUTH-006.
+
+Question 16 -> Fully Compliant. Each user has unique ID in database. Email addresses must be unique. User authentication uses unique identifiers. See prisma/schema.prisma User model.
+
+Question 17 -> Fully Compliant. Comprehensive access control with RBAC, school-based data isolation, need-to-know principles enforced. All API endpoints protected. See md_files/security/COMPLIANCE.md ACCESS-001 through ACCESS-005.
+
+Question 18 -> Fully Compliant. Role-based access control enforced with 5 roles (ADMIN, CLINIC_MANAGER, NURSE, DOCTOR, STAFF). All endpoints protected with requireRole() middleware. See lib/auth.ts.
+
+Question 19 -> Fully Compliant. Access to confidential data controlled through role-based permissions. School-based data isolation ensures users only access their assigned school data. Principle of least privilege enforced. See References/SECURITY_ASSESSMENT_REPORT.md section 8.
+
+Question 20 -> Fully Compliant. All healthcare information protected by authentication/authorization. No public access. API endpoints require authentication. School-based data isolation. Audit logging tracks all access. See References/SECURITY_ASSESSMENT_REPORT.md sections 2 and 8.
+
+Question 21 -> Partially Compliant. Backup management (automated backups implemented - see app/api/admin/backup/route.ts). Logging and monitoring (comprehensive - see security/audit/audit-logger.ts, security/monitoring/security-monitor.ts). Other operational procedures need formal documentation.
+
+Question 22 -> Partially Compliant (Policy Documented / Operational Evidence Pending). Patch management procedures documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 7). Provide patch tickets/reports and firmware update logs.
+
+Question 23 -> Partially Compliant (Policy Documented / Operational Evidence Pending). Anti‑malware deployment requirements documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 6.2). Provide EDR/AV coverage report.
+
+Question 24 -> Partially Compliant (Policy Documented / Operational Evidence Pending). Anti‑malware update requirements documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 6.2.2). Provide signature currency reports.
+
+Question 25 -> Partially Compliant (Policy Documented / Operational Evidence Pending). Removable media scanning requirements documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 6.2.3) and security/policies/02-PORTABLE_MEDIA_SECURITY.md (section 8.1). Provide endpoint policy evidence/logs.
+
+Question 26 -> Partially Compliant (Policy Documented / Operational Evidence Pending). AutoRun disablement documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 6.2.3). Provide GPO/Intune configuration evidence.
+
+Question 27 -> Fully Compliant. Comprehensive monitoring implemented: security monitoring system (security/monitoring/security-monitor.ts), failed login tracking, suspicious activity detection, brute force detection, account compromise alerts. See References/SECURITY_ASSESSMENT_REPORT.md section 7.
+
+Question 28 -> Fully Compliant. Comprehensive audit logging: all user activities (login, logout, data access, modification), administrator activities, security events, exceptions, IP address and user agent tracking, immutable logs. See security/audit/audit-logger.ts, References/SECURITY_ASSESSMENT_REPORT.md section 2.
+
+Question 29 -> Partially Compliant. Security assessment report exists (References/SECURITY_ASSESSMENT_REPORT.md, December 2024, 98% compliance). Formal periodic assessment procedures may need documentation.
+
+Question 30 -> Fully Compliant. HTTPS/TLS enforcement through HSTS headers in production. All data transmission encrypted. Secure communication protocols enforced. See md_files/security/COMPLIANCE.md ENCRYPT-002, HEADER-005.
+
+Question 31 -> Fully Compliant. HTTPS/TLS encryption for all data in transit. Authentication required for all access. JWT tokens for secure authentication. HSTS headers enforce secure connections. CSRF protection. See References/SECURITY_ASSESSMENT_REPORT.md section 6.
+
+Question 32 -> Partially Compliant (Policy Documented / Infrastructure Evidence Pending). Network documentation requirements documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 5.2). Provide network diagrams/inventory/firewall exports.
+
+Question 33 -> Partially Compliant (Policy Documented / Operational Evidence Pending). Vulnerability mgmt procedures documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 8). Provide scan reports and remediation tickets.
+
+Question 34 -> Partially Compliant (Policy Documented / Operational Evidence Pending). Control review procedures documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 8.2.4). Provide quarterly review evidence.
+
+Question 35 -> Fully Compliant (Application Level). Application-level controls enforce authentication/authorization. Only authenticated/authorized users can access. Role-based access control restricts access. Network-level device trust (NAC) is infrastructure level.
+
+Question 36 -> Fully Compliant. Continuous security monitoring (security/monitoring/security-monitor.ts), real-time security event monitoring, security alerts, audit log review capabilities. See References/SECURITY_ASSESSMENT_REPORT.md section 7.
+
+Question 37 -> Partially Compliant (Policy Documented / Infrastructure Evidence Pending). Segmentation requirements documented in security/policies/06-INFRASTRUCTURE_SECURITY_GUIDANCE.md (section 5.2.2). Provide VLAN/routing/ACL evidence.
+
+Question 38 -> Partially Compliant. Technical controls demonstrate commitment (comprehensive access controls, encryption, audit logging, data isolation). Formal written management policy document may need to be developed.
+
+Question 39 -> Fully Compliant. Third‑party security policy documented in security/policies/05-THIRD_PARTY_SECURITY.md. Technical implementation: vendor registry and APIs in app/api/security/vendors/route.ts + DB model Vendor.
+
+Question 40 -> Fully Compliant. Third‑party monitoring/enforcement procedures documented in security/policies/05-THIRD_PARTY_SECURITY.md; vendor management APIs + audit logging events implemented.
+
+Question 41 -> Fully Compliant. Incident response policy documented in security/policies/04-INCIDENT_RESPONSE_POLICY.md; technical implementation: SecurityIncident model + APIs (app/api/security/incidents) + admin UI (/admin/security/incidents).
+

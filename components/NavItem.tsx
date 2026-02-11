@@ -29,7 +29,7 @@ export default function NavItem({
       <Link
         href={href}
         className={`
-          group flex items-center gap-3 px-4 py-3 rounded-xl
+          group flex items-center gap-2.5 px-3 py-2.5 rounded-xl
           transition-all duration-200 ease-in-out
           ${sidebarOpen ? 'justify-start' : 'justify-center'}
           ${

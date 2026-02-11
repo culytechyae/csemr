@@ -72,14 +72,18 @@ model User {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  school          School?              @relation(fields: [schoolId], references: [id])
-  sessions        Session[]
-  clinicalVisits  ClinicalVisit[]
-  assessments     ClinicalAssessment[]
-  healthRecords   HealthRecord[]
-  passwordHistory PasswordHistory[]
-  loginAttempts   LoginAttempt[]
-  emailLogs       EmailLog[]
+  school            School?              @relation(fields: [schoolId], references: [id])
+  sessions          Session[]
+  clinicalVisits    ClinicalVisit[]
+  assessments       ClinicalAssessment[]
+  healthRecords     HealthRecord[]
+  passwordHistory   PasswordHistory[]
+  loginAttempts     LoginAttempt[]
+  emailLogs         EmailLog[]
+  reportedIncidents SecurityIncident[]   @relation("ReportedIncidents")
+  assignedIncidents SecurityIncident[]   @relation("AssignedIncidents")
+  vendors           Vendor[]
+  securityTrainings SecurityTraining[]
 
   @@index([email])
   @@index([schoolId])
@@ -139,6 +143,9 @@ model Student {
   gender            Gender
   nationality       String?
   bloodType         BloodType @default(UNKNOWN)
+  grade             String? // Student grade level
+  homeroom          String? // Homeroom class/teacher
+  studentEmiratesId String? // UAE Emirates ID
   parentName        String
   parentPhone       String
   parentEmail       String?
@@ -300,7 +307,7 @@ model SchoolHL7Config {
   id                   String   @id @default(cuid())
   schoolId             String   @unique
   // MSH Segment Configuration
-  facilityCode         String   // DOH-assigned facility code (e.g., MF7163)
+  facilityCode         String // DOH-assigned facility code (e.g., MF7163)
   sendingApplication   String   @default("SchoolClinicEMR")
   sendingFacility      String // Usually facility code or school code
   receivingApplication String   @default("Rhapsody")
@@ -312,7 +319,7 @@ model SchoolHL7Config {
   retryAttempts        Int      @default(3)
   // Doctor ID Configuration
   validDoctorIds       String?  @db.Text // Comma-separated list of valid doctor IDs
-  defaultDoctorId      String?  // Default doctor ID to use if provided ID is invalid
+  defaultDoctorId      String? // Default doctor ID to use if provided ID is invalid
   // Message Type Settings (JSON string for which types to auto-send)
   autoSendMessageTypes String?  @db.Text // JSON array: ["ADT_A01", "ADT_A04", "ORU_R01"]
   // Environment Settings
@@ -431,4 +438,158 @@ model EmailLog {
   @@index([sentBy])
   @@index([createdAt])
   @@index([sentAt])
+}
+
+enum IncidentSeverity {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  CONTAINED
+  RESOLVED
+  CLOSED
+}
+
+model SecurityIncident {
+  id              String           @id @default(cuid())
+  title           String
+  description     String           @db.Text
+  severity        IncidentSeverity
+  status          IncidentStatus   @default(OPEN)
+  category        String // UNAUTHORIZED_ACCESS, MALWARE, DATA_BREACH, POLICY_VIOLATION, etc.
+  reportedBy      String? // userId who reported
+  assignedTo      String? // userId assigned to investigate
+  detectedAt      DateTime         @default(now())
+  containedAt     DateTime?
+  resolvedAt      DateTime?
+  closedAt        DateTime?
+  impact          String?          @db.Text
+  rootCause       String?          @db.Text
+  remediation     String?          @db.Text
+  affectedSystems String?          @db.Text
+  affectedData    String?          @db.Text
+  breachConfirmed Boolean          @default(false)
+  notified        Boolean          @default(false)
+  notifiedAt      DateTime?
+  metadata        String?          @db.Text // JSON string for additional data
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  reportedByUser User? @relation("ReportedIncidents", fields: [reportedBy], references: [id], onDelete: SetNull)
+  assignedToUser User? @relation("AssignedIncidents", fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@index([severity])
+  @@index([status])
+  @@index([category])
+  @@index([reportedBy])
+  @@index([assignedTo])
+  @@index([breachConfirmed])
+  @@index([createdAt])
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Vendor {
+  id                     String       @id @default(cuid())
+  name                   String
+  contactName            String
+  contactEmail           String
+  contactPhone           String
+  companyName            String
+  address                String?
+  status                 VendorStatus @default(PENDING)
+  riskLevel              RiskLevel    @default(MEDIUM)
+  hasSystemAccess        Boolean      @default(false)
+  hasDataAccess          Boolean      @default(false)
+  hasNetworkAccess       Boolean      @default(false)
+  accessLevel            String? // NETWORK, SYSTEM, DATA, ALL
+  services               String?      @db.Text
+  contractStart          DateTime?
+  contractEnd            DateTime?
+  lastAssessment         DateTime?
+  nextAssessment         DateTime?
+  complianceStatus       String? // MALAFFI_COMPLIANT, ADHICS_COMPLIANT, HIPAA_COMPLIANT
+  securityCertifications String?      @db.Text // ISO 27001, SOC 2, etc.
+  slaDocument            String? // URL or file path
+  ndaSigned              Boolean      @default(false)
+  ndaSignedAt            DateTime?
+  agreementSigned        Boolean      @default(false)
+  agreementSignedAt      DateTime?
+  notes                  String?      @db.Text
+  createdBy              String? // userId who created
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  createdByUser User? @relation(fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([riskLevel])
+  @@index([hasSystemAccess])
+  @@index([hasDataAccess])
+  @@index([lastAssessment])
+  @@index([createdAt])
+}
+
+enum TrainingStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+}
+
+enum TrainingType {
+  SECURITY_AWARENESS
+  ANNUAL_REFRESHER
+  ROLE_SPECIFIC
+  INCIDENT_RESPONSE
+  VENDOR_SECURITY
+  COMPLIANCE
+}
+
+model SecurityTraining {
+  id             String         @id @default(cuid())
+  userId         String
+  trainingType   TrainingType
+  title          String
+  description    String?        @db.Text
+  status         TrainingStatus @default(PENDING)
+  completedAt    DateTime?
+  expiresAt      DateTime?
+  certificateUrl String?
+  score          Int?
+  maxScore       Int?
+  duration       Int? // in minutes
+  trainingDate   DateTime?
+  dueDate        DateTime?
+  reminderSent   Boolean        @default(false)
+  reminderSentAt DateTime?
+  metadata       String?        @db.Text // JSON string for additional data
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([trainingType])
+  @@index([status])
+  @@index([dueDate])
+  @@index([completedAt])
+  @@index([createdAt])
 }

@@ -23,6 +23,9 @@ const studentSchema = z.object({
     'O_NEGATIVE',
     'UNKNOWN',
   ]).optional(),
+  grade: z.string().optional(),
+  homeroom: z.string().optional(),
+  studentEmiratesId: z.string().optional(),
   parentName: z.string().min(1),
   parentPhone: z.string().min(1),
   parentEmail: z.string().email().optional(),
@@ -39,6 +42,8 @@ export const GET = requireAuth(async (req: NextRequest, user) => {
     const { searchParams } = new URL(req.url);
     const schoolId = searchParams.get('schoolId');
     const search = searchParams.get('search');
+    const grade = searchParams.get('grade');
+    const homeroom = searchParams.get('homeroom');
 
     const whereClause: any = {};
     if (user.role !== 'ADMIN' && user.schoolId) {
@@ -55,18 +60,27 @@ export const GET = requireAuth(async (req: NextRequest, user) => {
       ];
     }
 
+    if (grade) {
+      whereClause.grade = grade;
+    }
+
+    if (homeroom) {
+      whereClause.homeroom = homeroom;
+    }
+
     const students = await prisma.student.findMany({
       where: { ...whereClause, isActive: true },
       include: {
         school: {
           select: {
+            id: true,
             name: true,
             code: true,
           },
         },
       },
       orderBy: { lastName: 'asc' },
-      take: 100,
+      take: 1000,
     });
 
     return NextResponse.json(students);

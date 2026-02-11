@@ -63,6 +63,7 @@ if %ERRORLEVEL% NEQ 0 (
 
 REM Set production environment
 set NODE_ENV=production
+set PORT=8000
 
 REM Start the watchdog
 echo.
@@ -73,8 +74,8 @@ echo Health checks will run every 30 seconds
 echo.
 echo Server will be accessible on all network interfaces (0.0.0.0)
 echo Access URLs:
-echo   - Local:    http://localhost:5005
-echo   - Network:  http://[SERVER_IP]:5005
+echo   - Local:    http://localhost:8000
+echo   - Network:  http://[SERVER_IP]:8000
 echo.
 echo Press Ctrl+C to stop
 echo.

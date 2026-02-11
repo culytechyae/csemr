@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verifyPassword } from '@/security/utils/password';
 import { recordFailedLoginAttempt, recordSuccessfulLogin, isAccountLocked } from '@/security/utils/account-lockout';
 import { createSession } from '@/security/utils/session-manager';
-import { logSecurityEvent, getClientInfo } from '@/security/audit/audit-logger';
+import { logSecurityEvent, getClientInfo, logRemoteAccess } from '@/security/audit/audit-logger';
 import { loginRateLimit } from '@/security/middleware/rate-limiter';
 import { sanitizeString } from '@/security/middleware/input-sanitizer';
 
@@ -96,8 +96,35 @@ export async function POST(request: NextRequest) {
     await recordSuccessfulLogin(user.id, ipAddress, userAgent);
     await logSecurityEvent('LOGIN_SUCCESS', user.id, 'INFO', `Successful login for ${email}`, request);
 
+    // Detect and log remote access
+    const isRemoteAccess = user.lastLoginIp && user.lastLoginIp !== ipAddress;
+    if (isRemoteAccess) {
+      // Check if it's likely a VPN (can be enhanced with VPN detection logic)
+      const isVPN = ipAddress && (
+        ipAddress.startsWith('10.') ||
+        ipAddress.startsWith('172.16.') ||
+        ipAddress.startsWith('192.168.') ||
+        request.headers.get('x-forwarded-for')?.includes('vpn') ||
+        userAgent?.toLowerCase().includes('mobile') ||
+        userAgent?.toLowerCase().includes('remote')
+      );
+
+      const accessType = isVPN ? 'VPN' : 'WEB';
+      await logRemoteAccess(user.id, accessType as 'VPN' | 'WEB' | 'RDP', request, {
+        previousIP: user.lastLoginIp || 'N/A',
+        currentIP: ipAddress || 'N/A',
+        locationChanged: true,
+      });
+    }
+
     // Create session
     const session = await createSession(user.id, ipAddress, userAgent);
+
+    // Update last login IP
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginIp: ipAddress || null, lastLoginAt: new Date() },
+    });
 
     const response = NextResponse.json({
       success: true,

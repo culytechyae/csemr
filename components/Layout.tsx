@@ -12,6 +12,7 @@ import {
   HL7Icon,
   UsersIcon,
   ImportIcon,
+  AnalyticsIcon,
   LogoutIcon,
   MenuIcon,
   CloseIcon,
@@ -35,12 +36,18 @@ interface NavItemConfig {
   activeTextColor: string;
 }
 
-export default function Layout({ children }: { children: React.ReactNode }) {
+export default function Layout({
+  children,
+  defaultSidebarOpen = true,
+}: {
+  children: React.ReactNode;
+  defaultSidebarOpen?: boolean;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
@@ -246,6 +253,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       activeTextColor: 'text-cyan-700',
     },
     {
+      href: '/analytics',
+      label: 'Health Analytics',
+      icon: <AnalyticsIcon />,
+      iconColor: '#e11d48', // Rose
+      activeBgColor: 'bg-rose-50',
+      activeTextColor: 'text-rose-700',
+    },
+    {
       href: '/hl7',
       label: 'HL7 Messages',
       icon: <HL7Icon />,
@@ -300,7 +315,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         className={`
           ${isMobile ? 'fixed' : 'fixed'}
           ${isMobile ? (mobileMenuOpen ? 'translate-x-0' : '-translate-x-full') : ''}
-          ${!isMobile && sidebarOpen ? 'w-72' : !isMobile ? 'w-20' : 'w-72'}
+          ${!isMobile && sidebarOpen ? 'w-60' : !isMobile ? 'w-16' : 'w-60'}
           bg-white border-r border-gray-200/80
           shadow-sm
           transition-all duration-300 ease-in-out
@@ -314,10 +329,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-200/60 flex items-center justify-between flex-shrink-0 gap-3">
           {(!isMobile && sidebarOpen) || (isMobile && mobileMenuOpen) ? (
             <h1 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight flex-shrink-0">
-              Taaleem Clinic
+              EMR
             </h1>
           ) : !isMobile ? (
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight flex-shrink-0">TC</h1>
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight flex-shrink-0">E</h1>
           ) : null}
           <div className="flex items-center gap-2 flex-shrink-0">
             {!isMobile && (
@@ -414,7 +429,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div 
         className={`
           flex-1 flex flex-col min-h-screen overflow-hidden transition-all duration-300 ease-in-out
-          ${isMobile ? 'ml-0' : sidebarOpen ? 'ml-72' : 'ml-20'}
+          ${isMobile ? 'ml-0' : sidebarOpen ? 'ml-60' : 'ml-16'}
         `}
       >
         {/* Top Header - Mobile hamburger menu */}
@@ -433,7 +448,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               )}
               <div className="flex flex-col min-w-0">
                 <h2 className="text-sm sm:text-base md:text-lg font-semibold text-gray-800 truncate">
-                  {isMobile ? 'Taaleem Clinic' : 'Taaleem Clinic Management'}
+                  {isMobile ? 'EMR' : 'Taaleem CS EMR'}
                 </h2>
                 {user.schoolId && !isMobile && (
                   <span className="text-xs sm:text-sm text-gray-500 truncate">

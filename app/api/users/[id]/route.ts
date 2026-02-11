@@ -111,8 +111,37 @@ export async function PUT(
         }
       }
 
+      // Check email uniqueness if changing email
+      if (data.email && data.email !== targetUser.email) {
+        const existingUser = await prisma.user.findUnique({
+          where: { email: data.email },
+        });
+        if (existingUser) {
+          return NextResponse.json(
+            { error: 'A user with this email already exists' },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Validate schoolId if provided
+      if (data.schoolId) {
+        const schoolExists = await prisma.school.findUnique({
+          where: { id: data.schoolId },
+        });
+        if (!schoolExists) {
+          return NextResponse.json(
+            { error: 'Selected school does not exist' },
+            { status: 400 }
+          );
+        }
+      }
+
       // Handle password change using password policy
       const updateData: any = { ...data };
+      // Remove password from update data — it's not a DB column
+      delete updateData.password;
+
       if (data.password) {
         // Only ADMIN can reset passwords for other users
         if (user.role !== 'ADMIN') {
@@ -130,8 +159,11 @@ export async function PUT(
             { status: 400 }
           );
         }
-        // Remove password from update data as it's already handled
-        delete updateData.password;
+      }
+
+      // Ensure schoolId is null for ADMIN role
+      if (updateData.role === 'ADMIN') {
+        updateData.schoolId = null;
       }
 
       const updatedUser = await prisma.user.update({
@@ -162,6 +194,35 @@ export async function PUT(
           { status: 400 }
         );
       }
+
+      // Handle Prisma-specific errors
+      const prismaError = error as any;
+      if (prismaError?.code === 'P2002') {
+        const target = prismaError.meta?.target;
+        if (target?.includes('email')) {
+          return NextResponse.json(
+            { error: 'A user with this email already exists' },
+            { status: 400 }
+          );
+        }
+        return NextResponse.json(
+          { error: 'A unique constraint violation occurred' },
+          { status: 400 }
+        );
+      }
+      if (prismaError?.code === 'P2003') {
+        return NextResponse.json(
+          { error: 'Invalid reference: the selected school may not exist' },
+          { status: 400 }
+        );
+      }
+      if (prismaError?.code === 'P2025') {
+        return NextResponse.json(
+          { error: 'User not found or has been deleted' },
+          { status: 404 }
+        );
+      }
+
       console.error('User update error:', error);
       return NextResponse.json(
         { error: 'Internal server error' },

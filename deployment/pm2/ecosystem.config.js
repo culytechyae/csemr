@@ -13,7 +13,7 @@ module.exports = {
   apps: [{
     name: 'taaleem-emr',
     script: './node_modules/next/dist/bin/next',
-    args: 'start -p 5005',
+    args: 'start -p 8000 -H 0.0.0.0',
     
     // Cluster mode - run multiple instances for load balancing
     instances: 'max', // Use all CPU cores, or specify number like 4
@@ -22,7 +22,7 @@ module.exports = {
     // Environment variables
     env: {
       NODE_ENV: 'production',
-      PORT: 5005
+      PORT: 8000
     },
     
     // Logging (Malaffi Compliance: Audit Logging)

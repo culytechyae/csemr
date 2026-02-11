@@ -5,7 +5,7 @@ This directory contains batch scripts for managing the Taaleem Clinic Management
 ## Scripts
 
 ### `start.bat`
-Starts the production server on port 5005.
+Starts the production server using PM2 on port 8000.
 
 **Usage:**
 ```batch
@@ -13,11 +13,44 @@ start.bat
 ```
 
 **Features:**
-- Checks for Node.js installation
+- Checks for Node.js and PM2 installation
 - Verifies dependencies
 - Builds application if needed
 - Generates Prisma client
-- Starts production server
+- Runs database migrations
+- Starts production server with PM2 in cluster mode
+- Uses all CPU cores for load balancing
+- Auto-restart on crashes
+
+### `restart.bat` ⭐ **NEW**
+Restarts the production server gracefully using PM2.
+
+**Usage:**
+```batch
+restart.bat
+```
+
+**Features:**
+- Gracefully restarts all PM2 instances
+- Regenerates Prisma client (if schema changed)
+- Runs database migrations (if schema changed)
+- Rebuilds application if needed
+- Preserves PM2 configuration
+- Shows PM2 status after restart
+
+### `stop.bat` ⭐ **NEW**
+Stops the production server and cleans up all processes.
+
+**Usage:**
+```batch
+stop.bat
+```
+
+**Features:**
+- Stops PM2 processes
+- Kills processes on ports 8000 and 5005
+- Cleans up any hanging processes
+- Use before starting if you encounter port conflicts
 
 ### `start-dev.bat`
 Starts the development server with hot-reload on port 3000.
@@ -106,7 +139,7 @@ All security alerts are logged to the database (`SecurityEvent` table) and the w
 
 The watchdog monitors the server via:
 ```
-GET http://localhost:5005/api/health
+GET http://localhost:8000/api/health
 ```
 
 This endpoint checks:
@@ -124,10 +157,42 @@ The watchdog includes protection against restart loops:
 ## Troubleshooting
 
 ### Server Won't Start
+
+**Common Issues:**
+
+1. **Port Already in Use**
+   - Error: `EADDRINUSE: address already in use`
+   - Solution: Run `stop.bat` to clean up existing processes
+   - Or manually: `netstat -ano | findstr :8000` then `taskkill /PID [PID] /F`
+
+2. **PM2 Process Already Running**
+   - Error: "Application is already running with PM2!"
+   - Solution: Use `restart.bat` or `stop.bat` first
+
+3. **Node.js Not Found**
+   - Error: "Node.js is not installed or not in PATH"
+   - Solution: Install Node.js from https://nodejs.org/
+
+4. **Dependencies Missing**
+   - Error: "Failed to install dependencies"
+   - Solution: Run `install.bat` first
+
+5. **Build Missing**
+   - Error: "Build failed" or ".next not found"
+   - Solution: Run `build.bat` first
+
+6. **Database Connection Issues**
+   - Error: Database migration failed
+   - Solution: Verify PostgreSQL is running and `.env` has correct `DATABASE_URL`
+
+**Diagnostic Steps:**
 1. Check Node.js is installed: `node --version`
 2. Verify dependencies: `npm install`
 3. Check environment variables: `.env` file
-4. Review logs: `logs/watchdog.log` and `logs/server.log`
+4. Review logs: `logs/pm2-error.log` and `logs/pm2-out.log`
+5. Check ports: `netstat -ano | findstr :8000`
+6. Stop all processes: `stop.bat`
+7. Try starting again: `start.bat`
 
 ### Watchdog Not Restarting
 1. Check restart limit hasn't been exceeded
@@ -145,14 +210,25 @@ The watchdog includes protection against restart loops:
 
 For production deployment, use:
 ```batch
-start-watchdog.bat
+start.bat
 ```
 
 This ensures:
+- PM2 process management
+- Cluster mode (load balancing)
 - Automatic recovery from crashes
-- Continuous security monitoring
-- Health monitoring
-- Comprehensive logging
+- Multiple instances for high availability
+
+To restart after updates:
+```batch
+restart.bat
+```
+
+This will:
+- Gracefully restart all instances
+- Apply database migrations
+- Regenerate Prisma client
+- Rebuild if needed
 
 ## Manual Security Monitoring
 

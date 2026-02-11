@@ -55,6 +55,50 @@ export const GET = requireAuth(async (req: NextRequest, user) => {
     const { searchParams } = new URL(req.url);
     const studentId = searchParams.get('studentId');
     const schoolId = searchParams.get('schoolId');
+    const search = searchParams.get('search');
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    const grade = searchParams.get('grade');
+    const homeroom = searchParams.get('homeroom');
+    const visitType = searchParams.get('visitType');
+    const fetchFilters = searchParams.get('filters');
+
+    // If requesting available filter options
+    if (fetchFilters === 'true') {
+      const filterWhereClause: any = {};
+      if (user.role !== 'ADMIN' && user.schoolId) {
+        filterWhereClause.schoolId = user.schoolId;
+      }
+
+      const [grades, homerooms, schools] = await Promise.all([
+        prisma.student.findMany({
+          where: { ...filterWhereClause, grade: { not: null }, isActive: true },
+          select: { grade: true },
+          distinct: ['grade'],
+          orderBy: { grade: 'asc' },
+        }),
+        prisma.student.findMany({
+          where: { ...filterWhereClause, homeroom: { not: null }, isActive: true },
+          select: { homeroom: true },
+          distinct: ['homeroom'],
+          orderBy: { homeroom: 'asc' },
+        }),
+        user.role === 'ADMIN'
+          ? prisma.school.findMany({
+              where: { isActive: true },
+              select: { id: true, name: true, code: true },
+              orderBy: { name: 'asc' },
+            })
+          : [],
+      ]);
+
+      return NextResponse.json({
+        grades: grades.map((g) => g.grade).filter(Boolean),
+        homerooms: homerooms.map((h) => h.homeroom).filter(Boolean),
+        schools,
+        visitTypes: ['ROUTINE_CHECKUP', 'ILLNESS', 'INJURY', 'VACCINATION', 'EMERGENCY', 'FOLLOW_UP'],
+      });
+    }
 
     const whereClause: any = {};
     if (user.role !== 'ADMIN' && user.schoolId) {
@@ -67,6 +111,45 @@ export const GET = requireAuth(async (req: NextRequest, user) => {
       whereClause.studentId = studentId;
     }
 
+    // Date range filter
+    if (dateFrom || dateTo) {
+      whereClause.visitDate = {};
+      if (dateFrom) {
+        whereClause.visitDate.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        const endDate = new Date(dateTo);
+        endDate.setHours(23, 59, 59, 999);
+        whereClause.visitDate.lte = endDate;
+      }
+    }
+
+    // Visit type filter
+    if (visitType) {
+      whereClause.visitType = visitType;
+    }
+
+    // Grade and homeroom filter via student relation
+    if (grade || homeroom) {
+      whereClause.student = {};
+      if (grade) {
+        whereClause.student.grade = grade;
+      }
+      if (homeroom) {
+        whereClause.student.homeroom = homeroom;
+      }
+    }
+
+    // Search by student name, ID, or complaint
+    if (search) {
+      whereClause.OR = [
+        { student: { firstName: { contains: search, mode: 'insensitive' } } },
+        { student: { lastName: { contains: search, mode: 'insensitive' } } },
+        { student: { studentId: { contains: search, mode: 'insensitive' } } },
+        { chiefComplaint: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
     const visits = await prisma.clinicalVisit.findMany({
       where: whereClause,
       include: {
@@ -76,6 +159,8 @@ export const GET = requireAuth(async (req: NextRequest, user) => {
             firstName: true,
             lastName: true,
             studentId: true,
+            grade: true,
+            homeroom: true,
           },
         },
         school: {
@@ -93,7 +178,7 @@ export const GET = requireAuth(async (req: NextRequest, user) => {
         },
       },
       orderBy: { visitDate: 'desc' },
-      take: 100,
+      take: 200,
     });
 
     return NextResponse.json(visits);

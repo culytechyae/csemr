@@ -70,7 +70,7 @@ echo Next steps:
 echo   1. Verify .env file has correct settings
 echo   2. Update MALAFFI_API_KEY in .env if needed
 echo   3. Run: npm start
-echo   4. Open: http://localhost:5005
+echo   4. Open: http://localhost:8000
 echo   5. Login: admin@emr.local / admin123
 echo.
 pause

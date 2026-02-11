@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
 import { verifyMFACode } from '@/security/utils/mfa';
 import { decryptData } from '@/security/utils/encryption';
-import { logSecurityEvent } from '@/security/audit/audit-logger';
+import { logSecurityEvent, getClientInfo, logRemoteAccess } from '@/security/audit/audit-logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,6 +76,32 @@ export async function POST(request: NextRequest) {
         `Successful MFA verification for ${user.email}`,
         request
       );
+
+      // Detect and log remote access after MFA verification
+      const { ipAddress } = getClientInfo(request);
+      const isRemoteAccess = user.lastLoginIp && user.lastLoginIp !== ipAddress;
+      if (isRemoteAccess) {
+        const isVPN = ipAddress && (
+          ipAddress.startsWith('10.') ||
+          ipAddress.startsWith('172.16.') ||
+          ipAddress.startsWith('192.168.') ||
+          request.headers.get('x-forwarded-for')?.toLowerCase().includes('vpn')
+        );
+
+        const accessType = isVPN ? 'VPN' : 'WEB';
+        await logRemoteAccess(user.id, accessType as 'VPN' | 'WEB' | 'RDP', request, {
+          previousIP: user.lastLoginIp || 'N/A',
+          currentIP: ipAddress || 'N/A',
+          locationChanged: true,
+          mfaVerified: true,
+        });
+      }
+
+      // Update last login IP
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginIp: ipAddress || null, lastLoginAt: new Date() },
+      });
 
       const response = NextResponse.json({
         success: true,

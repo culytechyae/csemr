@@ -21,7 +21,17 @@ export type AuditAction =
   | 'DATA_EXPORT'
   | 'DATA_IMPORT'
   | 'HL7_SEND'
-  | 'HL7_RECEIVE';
+  | 'HL7_RECEIVE'
+  | 'PORTABLE_MEDIA_ACCESS'
+  | 'PORTABLE_MEDIA_COPY'
+  | 'REMOTE_ACCESS'
+  | 'REMOTE_ACCESS_VPN'
+  | 'INCIDENT_REPORTED'
+  | 'INCIDENT_UPDATED'
+  | 'INCIDENT_RESOLVED'
+  | 'VENDOR_ACCESS'
+  | 'VENDOR_CREATED'
+  | 'TRAINING_COMPLETED';
 
 export type AuditSeverity = 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
 
@@ -161,5 +171,74 @@ export async function logSecurityEvent(
     userAgent,
     metadata,
   });
+}
+
+/**
+ * Log portable media access or data copy
+ */
+export async function logPortableMediaAccess(
+  userId: string | null,
+  action: 'ACCESS' | 'COPY',
+  mediaType: string,
+  request: NextRequest,
+  metadata?: Record<string, any>
+): Promise<void> {
+  const { ipAddress, userAgent } = getClientInfo(request);
+
+  await logAuditEvent({
+    userId,
+    action: action === 'COPY' ? 'PORTABLE_MEDIA_COPY' : 'PORTABLE_MEDIA_ACCESS',
+    entityType: 'PORTABLE_MEDIA',
+    entityId: mediaType,
+    severity: action === 'COPY' ? 'WARNING' : 'INFO',
+    ipAddress,
+    userAgent,
+    metadata,
+  });
+
+  await logSecurityEvent(
+    `PORTABLE_MEDIA_${action}`,
+    userId,
+    action === 'COPY' ? 'WARNING' : 'INFO',
+    `Portable media ${action.toLowerCase()}: ${mediaType}`,
+    request,
+    metadata
+  );
+}
+
+/**
+ * Log remote access activities
+ */
+export async function logRemoteAccess(
+  userId: string | null,
+  accessType: 'VPN' | 'RDP' | 'WEB',
+  request: NextRequest,
+  metadata?: Record<string, any>
+): Promise<void> {
+  const { ipAddress, userAgent } = getClientInfo(request);
+
+  const action: AuditAction = accessType === 'VPN' 
+    ? 'REMOTE_ACCESS_VPN' 
+    : 'REMOTE_ACCESS';
+
+  await logAuditEvent({
+    userId,
+    action,
+    entityType: 'REMOTE_ACCESS',
+    entityId: accessType,
+    severity: 'INFO',
+    ipAddress,
+    userAgent,
+    metadata,
+  });
+
+  await logSecurityEvent(
+    `REMOTE_ACCESS_${accessType}`,
+    userId,
+    'INFO',
+    `Remote access via ${accessType}`,
+    request,
+    metadata
+  );
 }
 
