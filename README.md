@@ -1,6 +1,8 @@
-# School Clinic EMR System
+# Taaleem CS EMR
 
 A comprehensive Electronic Medical Records (EMR) management system for school clinics with HL7 integration for Malaffi (Abu Dhabi Health Information Exchange).
+
+<!-- CodeRabbit review enabled -->
 
 ## Features
 
