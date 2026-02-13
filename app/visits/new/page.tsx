@@ -5,6 +5,19 @@ import { useRouter } from 'next/navigation';
 import Layout from '@/components/Layout';
 import Breadcrumb from '@/components/Breadcrumb';
 import PainScaleSelector from '@/components/PainScaleSelector';
+import {
+  Thermometer,
+  HeartPulse,
+  Wind,
+  Droplets,
+  Ruler,
+  Activity,
+  AlertTriangle,
+  Clock,
+  Eye,
+  Stethoscope,
+  X,
+} from 'lucide-react';
 
 interface Student {
   id: string;
@@ -53,6 +66,16 @@ interface StudentSummary {
   };
 }
 
+/* ── shared input class tokens ─────────────────────────── */
+const INPUT =
+  'block w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-shadow disabled:bg-gray-50 disabled:text-gray-500';
+const SELECT = INPUT;
+const LABEL = 'block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5';
+const CARD = 'bg-white rounded-2xl border border-gray-200/80 shadow-sm';
+
+/* ── eye acuity options (reused 4 times) ───────────────── */
+const ACUITY = ['6/3','6/3.8','6/4.8','6/6','6/7.5','6/9.5','6/12','6/15','6/19','6/24','6/30','6/38','6/48','6/60'];
+
 export default function NewVisitPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -98,7 +121,6 @@ export default function NewVisitPage() {
       abdomen: '',
       neurological: '',
       otherFindings: '',
-      // Health Record fields
       colorBlindness: '',
       visionTestingPerformed: '',
       visionTestingNotPerformedReason: '',
@@ -112,20 +134,18 @@ export default function NewVisitPage() {
     },
   });
 
+  /* ── data loading (unchanged) ─────────────────────────── */
   useEffect(() => {
-    // Get current user info
     fetch('/api/auth/me')
       .then((res) => res.json())
       .then((data) => {
         if (data.user) {
           setUserRole(data.user.role);
           setUserSchoolId(data.user.schoolId || '');
-          // Auto-set school for non-admin users
           if (data.user.role !== 'ADMIN' && data.user.schoolId) {
             const schoolId = data.user.schoolId;
             setSelectedSchoolId(schoolId);
             setFormData((prev) => ({ ...prev, schoolId }));
-            // Load students for this school
             fetch(`/api/students?schoolId=${schoolId}`)
               .then((res) => res.json())
               .then((studentData) => setStudents(studentData));
@@ -133,25 +153,21 @@ export default function NewVisitPage() {
         }
       });
 
-    // Fetch schools (will be filtered by API based on user role)
     fetch('/api/schools')
       .then((res) => res.json())
       .then((data) => setSchools(data));
 
-    // Check for query parameters (when navigating from students page)
     const urlParams = new URLSearchParams(window.location.search);
     const studentIdParam = urlParams.get('studentId');
     const schoolIdParam = urlParams.get('schoolId');
-    
+
     if (schoolIdParam) {
       setSelectedSchoolId(schoolIdParam);
       setFormData((prev) => ({ ...prev, schoolId: schoolIdParam }));
-      // Load students for this school
       fetch(`/api/students?schoolId=${schoolIdParam}`)
         .then((res) => res.json())
         .then((studentData) => {
           setStudents(studentData);
-          // If studentId is provided, select it
           if (studentIdParam && studentData.find((s: Student) => s.id === studentIdParam)) {
             setFormData((prev) => ({ ...prev, studentId: studentIdParam, schoolId: schoolIdParam }));
           }
@@ -164,7 +180,6 @@ export default function NewVisitPage() {
       fetch(`/api/students?schoolId=${selectedSchoolId}`)
         .then((res) => res.json())
         .then((data) => setStudents(data));
-      // Clear student selection when school changes
       setFormData((prev) => ({ ...prev, studentId: '', schoolId: selectedSchoolId }));
       setStudentSearchQuery('');
       setIsStudentDropdownOpen(false);
@@ -177,28 +192,14 @@ export default function NewVisitPage() {
       fetch(`/api/students/${formData.studentId}/visits`)
         .then((res) => res.json())
         .then((data) => {
-          if (Array.isArray(data)) {
-            setPreviousVisits(data);
-          } else {
-            setPreviousVisits([]);
-          }
+          setPreviousVisits(Array.isArray(data) ? data : []);
           setLoadingVisits(false);
         })
-        .catch(() => {
-          setPreviousVisits([]);
-          setLoadingVisits(false);
-        });
+        .catch(() => { setPreviousVisits([]); setLoadingVisits(false); });
 
-      // Fetch richer student snapshot (allergies, summary, etc.)
       fetch(`/api/students/${formData.studentId}/summary`)
         .then((res) => res.json())
-        .then((data) => {
-          if (!data.error) {
-            setStudentSummary(data);
-          } else {
-            setStudentSummary(null);
-          }
-        })
+        .then((data) => setStudentSummary(data.error ? null : data))
         .catch(() => setStudentSummary(null));
     } else {
       setPreviousVisits([]);
@@ -207,10 +208,10 @@ export default function NewVisitPage() {
     }
   }, [formData.studentId]);
 
+  /* ── submit (unchanged) ───────────────────────────────── */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       const payload: any = {
         studentId: formData.studentId,
@@ -225,41 +226,28 @@ export default function NewVisitPage() {
         notifyParent: formData.notifyParent,
         assessment: Object.fromEntries(
           Object.entries(formData.assessment).map(([key, value]) => {
-            // Handle boolean fields
             if (key === 'visionTestingPerformed') {
               return [key, value === 'true' ? true : value === 'false' ? false : undefined];
             }
-            // Handle number fields
-            if (['temperature', 'bloodPressureSystolic', 'bloodPressureDiastolic', 'heartRate', 
-                 'respiratoryRate', 'oxygenSaturation', 'height', 'weight', 'painScale'].includes(key)) {
+            if (['temperature','bloodPressureSystolic','bloodPressureDiastolic','heartRate',
+                 'respiratoryRate','oxygenSaturation','height','weight','painScale'].includes(key)) {
               return [key, value === '' ? undefined : Number(value) || undefined];
             }
-            // Handle string fields
             return [key, value === '' ? undefined : value];
           })
         ),
       };
-
-      // Remove empty assessment fields
       if (payload.assessment) {
         Object.keys(payload.assessment).forEach((key) => {
-          if (payload.assessment[key] === '' || payload.assessment[key] === undefined) {
-            delete payload.assessment[key];
-          }
+          if (payload.assessment[key] === '' || payload.assessment[key] === undefined) delete payload.assessment[key];
         });
-
-        // Remove assessment if empty
-        if (Object.keys(payload.assessment).length === 0) {
-          delete payload.assessment;
-        }
+        if (Object.keys(payload.assessment).length === 0) delete payload.assessment;
       }
-
       const response = await fetch('/api/visits', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-
       if (response.ok) {
         router.push('/visits');
       } else {
@@ -267,45 +255,33 @@ export default function NewVisitPage() {
         alert(error.error || 'Failed to create visit');
         setLoading(false);
       }
-    } catch (error) {
+    } catch {
       alert('An error occurred');
       setLoading(false);
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric' 
-    });
-  };
+  /* ── helpers ──────────────────────────────────────────── */
+  const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  const formatVisitType = (t: string) => t.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 
-  const formatVisitType = (type: string) => {
-    return type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  // Filter students based on search query (by ID or name)
-  const filteredStudents = students.filter((student) => {
+  const filteredStudents = students.filter((s) => {
     if (!studentSearchQuery.trim()) return true;
-    const query = studentSearchQuery.toLowerCase().trim();
-    const fullName = `${student.firstName} ${student.lastName}`.toLowerCase();
-    const studentId = student.studentId.toLowerCase();
-    return fullName.includes(query) || studentId.includes(query);
+    const q = studentSearchQuery.toLowerCase().trim();
+    return `${s.firstName} ${s.lastName}`.toLowerCase().includes(q) || s.studentId.toLowerCase().includes(q);
   });
 
   const selectedStudent = students.find((s) => s.id === formData.studentId);
+  const handleStudentSelect = (id: string) => { setFormData({ ...formData, studentId: id }); setStudentSearchQuery(''); setIsStudentDropdownOpen(false); };
 
-  const handleStudentSelect = (studentId: string) => {
-    setFormData({ ...formData, studentId });
-    setStudentSearchQuery('');
-    setIsStudentDropdownOpen(false);
-  };
+  const setAssessment = (key: string, value: string) =>
+    setFormData((prev) => ({ ...prev, assessment: { ...prev.assessment, [key]: value } }));
 
+  /* ── RENDER ──────────────────────────────────────────── */
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full px-4 sm:px-6 lg:px-8 pb-28">
+        {/* ── Breadcrumb ─────────────────────────────────── */}
         <Breadcrumb
           items={[
             { label: 'Dashboard', href: '/dashboard' },
@@ -314,880 +290,523 @@ export default function NewVisitPage() {
           ]}
         />
 
-        <div className="flex items-start justify-between mb-5 mt-2 gap-3">
+        {/* ── Page header ────────────────────────────────── */}
+        <div className="flex items-start justify-between mb-6 mt-1 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 tracking-tight">New Assessment</h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Structured clinical visit entry with vitals, complaint, and plan.
+              Record vitals, complaint, diagnosis and plan for this clinical visit.
             </p>
           </div>
           {selectedStudent && (
-            <div className="hidden sm:flex flex-col items-end text-right">
-              <p className="text-sm font-semibold text-gray-900">
-                {selectedStudent.firstName} {selectedStudent.lastName}
-              </p>
-              <p className="text-xs text-slate-500">
-                ID {selectedStudent.studentId}
-                {studentSummary?.student?.grade && ` • Grade ${studentSummary.student.grade}`}
-              </p>
+            <div className="hidden sm:flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5">
+              <div className="w-9 h-9 rounded-full bg-indigo-200 text-indigo-700 flex items-center justify-center text-xs font-bold">
+                {selectedStudent.firstName[0]}{selectedStudent.lastName[0]}
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-semibold text-indigo-900">
+                  {selectedStudent.firstName} {selectedStudent.lastName}
+                </p>
+                <p className="text-[11px] text-indigo-600">
+                  ID {selectedStudent.studentId}
+                  {studentSummary?.student?.grade && ` · Grade ${studentSummary.student.grade}`}
+                </p>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)] gap-6 items-start">
-          {/* Assessment Form */}
-          <div>
-            <form
-              id="assessment-form"
-              onSubmit={handleSubmit}
-              className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-8"
-            >
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">School</label>
-              <select
-                value={selectedSchoolId}
-                onChange={(e) => {
-                  setSelectedSchoolId(e.target.value);
-                  setFormData({ ...formData, schoolId: e.target.value, studentId: '' });
-                }}
-                required
-                disabled={userRole !== 'ADMIN' && userSchoolId !== ''}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
-              >
-                <option value="">Select a school</option>
-                {schools.map((school) => (
-                  <option key={school.id} value={school.id}>
-                    {school.name}
-                  </option>
-                ))}
-              </select>
-              {userRole !== 'ADMIN' && userSchoolId && (
-                <p className="mt-1 text-sm text-gray-500">You can only create visits for your assigned school</p>
-              )}
-            </div>
+        {/* ── Two-column grid (70 / 30) ──────────────────── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Student</label>
-              <div className="mt-1 relative">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={isStudentDropdownOpen || !selectedStudent ? studentSearchQuery : `${selectedStudent.firstName} ${selectedStudent.lastName} (${selectedStudent.studentId})`}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setStudentSearchQuery(value);
-                      setIsStudentDropdownOpen(true);
-                      if (!value) {
-                        setFormData({ ...formData, studentId: '' });
-                      }
-                    }}
-                    onFocus={() => {
-                      setIsStudentDropdownOpen(true);
-                      // If a student is selected, clear it to allow searching
-                      if (selectedStudent) {
-                        setStudentSearchQuery('');
-                        setFormData({ ...formData, studentId: '' });
-                      }
-                    }}
-                    onBlur={() => {
-                      // Delay closing to allow click events
-                      setTimeout(() => setIsStudentDropdownOpen(false), 200);
-                    }}
-                    placeholder={selectedStudent ? "Click to search..." : "Search by student ID or name..."}
+          {/* ════════════════ LEFT COLUMN — FORM ═══════════ */}
+          <form id="assessment-form" onSubmit={handleSubmit} className="space-y-6">
+
+            {/* ── CARD 1 : Visit Details ────────────────── */}
+            <section className={`${CARD} p-6`}>
+              <div className="flex items-center gap-2.5 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <Stethoscope className="w-4 h-4" />
+                </div>
+                <h2 className="text-sm font-semibold text-gray-900">Visit Details</h2>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                {/* School */}
+                <div>
+                  <label className={LABEL}>School</label>
+                  <select
+                    value={selectedSchoolId}
+                    onChange={(e) => { setSelectedSchoolId(e.target.value); setFormData({ ...formData, schoolId: e.target.value, studentId: '' }); }}
                     required
-                    disabled={!selectedSchoolId}
-                    className="block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    disabled={userRole !== 'ADMIN' && userSchoolId !== ''}
+                    className={SELECT}
+                  >
+                    <option value="">Select a school</option>
+                    {schools.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  {userRole !== 'ADMIN' && userSchoolId && (
+                    <p className="mt-1 text-[11px] text-slate-400">Auto-assigned to your school</p>
+                  )}
+                </div>
+
+                {/* Student search */}
+                <div>
+                  <label className={LABEL}>Student</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={isStudentDropdownOpen || !selectedStudent ? studentSearchQuery : `${selectedStudent.firstName} ${selectedStudent.lastName} (${selectedStudent.studentId})`}
+                      onChange={(e) => { setStudentSearchQuery(e.target.value); setIsStudentDropdownOpen(true); if (!e.target.value) setFormData({ ...formData, studentId: '' }); }}
+                      onFocus={() => { setIsStudentDropdownOpen(true); if (selectedStudent) { setStudentSearchQuery(''); setFormData({ ...formData, studentId: '' }); } }}
+                      onBlur={() => setTimeout(() => setIsStudentDropdownOpen(false), 200)}
+                      placeholder={selectedStudent ? 'Click to search…' : 'Search by student ID or name…'}
+                      required
+                      disabled={!selectedSchoolId}
+                      className={INPUT}
+                    />
+                    <svg className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
-                  </div>
-                </div>
-                {isStudentDropdownOpen && selectedSchoolId && (
-                  <div className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none">
-                    {filteredStudents.length === 0 ? (
-                      <div className="px-4 py-2 text-sm text-gray-500">No students found</div>
-                    ) : (
-                      filteredStudents.map((student) => (
-                        <div
-                          key={student.id}
-                          onClick={() => handleStudentSelect(student.id)}
-                          className={`px-4 py-2 cursor-pointer hover:bg-blue-50 ${
-                            formData.studentId === student.id ? 'bg-blue-50' : ''
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-900">
-                              {student.firstName} {student.lastName}
-                            </span>
-                            <span className="text-sm text-gray-500">({student.studentId})</span>
+                    {isStudentDropdownOpen && selectedSchoolId && (
+                      <div className="absolute z-20 mt-1 w-full bg-white shadow-xl max-h-60 rounded-xl border border-gray-200 py-1 overflow-auto">
+                        {filteredStudents.length === 0 ? (
+                          <div className="px-4 py-3 text-sm text-gray-400">No students found</div>
+                        ) : filteredStudents.map((s) => (
+                          <div key={s.id} onClick={() => handleStudentSelect(s.id)}
+                            className={`px-4 py-2.5 cursor-pointer text-sm hover:bg-blue-50 transition-colors ${formData.studentId === s.id ? 'bg-blue-50' : ''}`}>
+                            <span className="font-medium text-gray-900">{s.firstName} {s.lastName}</span>
+                            <span className="ml-2 text-gray-400">({s.studentId})</span>
                           </div>
-                        </div>
-                      ))
+                        ))}
+                      </div>
                     )}
                   </div>
-                )}
-                {!selectedSchoolId && (
-                  <p className="mt-1 text-sm text-gray-500">Please select a school first</p>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Visit Type</label>
-              <select
-                value={formData.visitType}
-                onChange={(e) => setFormData({ ...formData, visitType: e.target.value })}
-                required
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="ROUTINE_CHECKUP">Routine Checkup</option>
-                <option value="ILLNESS">Illness</option>
-                <option value="INJURY">Injury</option>
-                <option value="VACCINATION">Vaccination</option>
-                <option value="EMERGENCY">Emergency</option>
-                <option value="FOLLOW_UP">Follow Up</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Chief Complaint</label>
-              <input
-                type="text"
-                value={formData.chiefComplaint}
-                onChange={(e) => setFormData({ ...formData, chiefComplaint: e.target.value })}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Vitals Grid */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-2">Vital Signs</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40">
-                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
-                  Temperature
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                  type="number"
-                  step="0.1"
-                  value={formData.assessment.temperature}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, temperature: e.target.value },
-                    })
-                  }
-                  className="block w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-slate-400">
-                    °C
-                  </span>
+                  {!selectedSchoolId && <p className="mt-1 text-[11px] text-slate-400">Select a school first</p>}
                 </div>
-              </div>
-              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40">
-                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
-                  Blood Pressure
-                </label>
-                <div className="mt-1 flex gap-2">
-                  <input
-                    type="number"
-                    placeholder="Systolic"
-                    value={formData.assessment.bloodPressureSystolic}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        assessment: {
-                          ...formData.assessment,
-                          bloodPressureSystolic: e.target.value,
-                        },
-                      })
-                    }
-                    className="block w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Diastolic"
-                    value={formData.assessment.bloodPressureDiastolic}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        assessment: {
-                          ...formData.assessment,
-                          bloodPressureDiastolic: e.target.value,
-                        },
-                      })
-                    }
-                    className="block w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">mmHg</p>
-              </div>
-              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40">
-                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
-                  Heart Rate
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                  type="number"
-                  value={formData.assessment.heartRate}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, heartRate: e.target.value },
-                    })
-                  }
-                  className="block w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-slate-400">
-                    bpm
-                  </span>
-                </div>
-              </div>
-              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40">
-                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
-                  Respiratory Rate
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                  type="number"
-                  value={formData.assessment.respiratoryRate}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, respiratoryRate: e.target.value },
-                    })
-                  }
-                  className="block w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-14 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-slate-400">
-                    / min
-                  </span>
-                </div>
-              </div>
-              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40">
-                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
-                  Oxygen Saturation
-                </label>
-                <div className="mt-1 relative">
-                  <input
-                  type="number"
-                  step="0.1"
-                  value={formData.assessment.oxygenSaturation}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, oxygenSaturation: e.target.value },
-                    })
-                  }
-                  className="block w-full rounded-lg border border-slate-200 bg-white py-2 pl-3 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                  <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs text-slate-400">
-                    %
-                  </span>
-                </div>
-              </div>
-              <div className="border border-slate-200 rounded-xl px-3 py-2.5 bg-slate-50/40 sm:col-span-2 xl:col-span-1">
-                <label className="block text-[11px] font-medium text-slate-500 uppercase tracking-wide">
-                  Height / Weight
-                </label>
-                <div className="mt-1 flex gap-2">
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="Height"
-                    value={formData.assessment.height}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        assessment: { ...formData.assessment, height: e.target.value },
-                      })
-                    }
-                    className="block w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                  <input
-                    type="number"
-                    step="0.1"
-                    placeholder="Weight"
-                    value={formData.assessment.weight}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        assessment: { ...formData.assessment, weight: e.target.value },
-                      })
-                    }
-                    className="block w-full rounded-lg border border-slate-200 bg-white py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <p className="mt-1 text-[11px] text-slate-400">cm / kg</p>
-              </div>
-            </div>
-          </div>
 
-          {/* Chief Complaint */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-900 mb-1">Chief Complaint</label>
-            <textarea
-              rows={3}
-              value={formData.chiefComplaint}
-              onChange={(e) => setFormData({ ...formData, chiefComplaint: e.target.value })}
-              placeholder="Describe the primary reason for today's visit..."
-              className="mt-1 block w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            <div className="mt-3 flex flex-wrap gap-2">
-              {['Headache', 'Fever', 'Abdominal pain', 'Injury during sports', 'Respiratory symptoms'].map(
-                (suggestion) => (
-                  <button
-                    key={suggestion}
-                    type="button"
-                    onClick={() =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        chiefComplaint: prev.chiefComplaint
-                          ? `${prev.chiefComplaint.trim()}${prev.chiefComplaint.trim().endsWith('.') ? '' : '.'} ${suggestion}`
-                          : suggestion,
-                      }))
-                    }
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-blue-50 hover:border-blue-200"
-                  >
-                    <span>＋</span>
-                    {suggestion}
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-
-          {/* Pain Scale Selector */}
-          <div className="border-t border-gray-200 pt-5">
-            <div className="flex items-center justify-between mb-2">
-              <div>
-                <h2 className="text-sm font-semibold text-gray-900">Pain Scale</h2>
-                <p className="text-[11px] text-slate-500">
-                  Tap the face that best matches the patient&apos;s pain level.
-                </p>
-              </div>
-            </div>
-            <PainScaleSelector
-              value={formData.assessment.painScale}
-              onChange={(score) =>
-                setFormData({
-                  ...formData,
-                  assessment: { ...formData.assessment, painScale: score.toString() },
-                })
-              }
-            />
-          </div>
-
-          {/* Diagnosis & Plan */}
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-sm font-semibold text-gray-900">Diagnosis</label>
-                <select
-                  className="ml-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  defaultValue=""
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (!value) return;
-                    setFormData((prev) => ({
-                      ...prev,
-                      diagnosis: prev.diagnosis ? `${prev.diagnosis}\n${value}` : value,
-                    }));
-                  }}
-                >
-                  <option value="">Common diagnoses…</option>
-                  <option value="Upper respiratory tract infection">Upper respiratory tract infection</option>
-                  <option value="Viral fever">Viral fever</option>
-                  <option value="Tension-type headache">Tension-type headache</option>
-                  <option value="Minor musculoskeletal injury">Minor musculoskeletal injury</option>
-                  <option value="Allergic reaction">Allergic reaction</option>
-                </select>
-              </div>
-              <textarea
-                value={formData.diagnosis}
-                onChange={(e) => setFormData({ ...formData, diagnosis: e.target.value })}
-                rows={3}
-                className="mt-1 block w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-900">Plan / Treatment</label>
-              <textarea
-                value={formData.treatment}
-                onChange={(e) => setFormData({ ...formData, treatment: e.target.value })}
-                rows={3}
-                className="mt-1 block w-full rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Notes</label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
-
-          {/* Health Record Fields - Auto-populated from latest health record */}
-          <div className="border-t border-gray-200 pt-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">Vision &amp; Health Record Data</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              These fields are automatically populated from the latest health record. You can modify them if needed.
-            </p>
-            
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Color Blindness</label>
-                <select
-                  value={formData.assessment.colorBlindness}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, colorBlindness: e.target.value },
-                    })
-                  }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select</option>
-                  <option value="Normal">Normal</option>
-                  <option value="Abnormal">Abnormal</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Vision Testing Performed</label>
-                <select
-                  value={formData.assessment.visionTestingPerformed}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, visionTestingPerformed: e.target.value },
-                    })
-                  }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select</option>
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
-                </select>
-              </div>
-
-              {formData.assessment.visionTestingPerformed === 'false' && (
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700">Reason Not Performed</label>
-                  <input
-                    type="text"
-                    value={formData.assessment.visionTestingNotPerformedReason}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        assessment: { ...formData.assessment, visionTestingNotPerformedReason: e.target.value },
-                      })
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Corrective Lenses</label>
-                <select
-                  value={formData.assessment.correctiveLenses}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, correctiveLenses: e.target.value },
-                    })
-                  }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select</option>
-                  <option value="None">None</option>
-                  <option value="Glasses">Glasses</option>
-                  <option value="Contact lenses">Contact lenses</option>
-                  <option value="Surgical correction">Surgical correction</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              {formData.assessment.correctiveLenses === 'Other' && (
+                {/* Visit Type */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Other Reason</label>
-                  <input
-                    type="text"
-                    value={formData.assessment.correctiveLensesOtherReason}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        assessment: { ...formData.assessment, correctiveLensesOtherReason: e.target.value },
-                      })
-                    }
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
+                  <label className={LABEL}>Visit Type</label>
+                  <select value={formData.visitType} onChange={(e) => setFormData({ ...formData, visitType: e.target.value })} required className={SELECT}>
+                    <option value="ROUTINE_CHECKUP">Routine Checkup</option>
+                    <option value="ILLNESS">Illness</option>
+                    <option value="INJURY">Injury</option>
+                    <option value="VACCINATION">Vaccination</option>
+                    <option value="EMERGENCY">Emergency</option>
+                    <option value="FOLLOW_UP">Follow Up</option>
+                  </select>
                 </div>
-              )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Right Eye</label>
-                <select
-                  value={formData.assessment.rightEye}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, rightEye: e.target.value },
-                    })
-                  }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select</option>
-                  <option value="6/3">6/3</option>
-                  <option value="6/3.8">6/3.8</option>
-                  <option value="6/4.8">6/4.8</option>
-                  <option value="6/6">6/6</option>
-                  <option value="6/7.5">6/7.5</option>
-                  <option value="6/9.5">6/9.5</option>
-                  <option value="6/12">6/12</option>
-                  <option value="6/15">6/15</option>
-                  <option value="6/19">6/19</option>
-                  <option value="6/24">6/24</option>
-                  <option value="6/30">6/30</option>
-                  <option value="6/38">6/38</option>
-                  <option value="6/48">6/48</option>
-                  <option value="6/60">6/60</option>
-                </select>
+                {/* Chief Complaint (short) */}
+                <div>
+                  <label className={LABEL}>Chief Complaint</label>
+                  <input type="text" value={formData.chiefComplaint} onChange={(e) => setFormData({ ...formData, chiefComplaint: e.target.value })} placeholder="Brief complaint…" className={INPUT} />
+                </div>
+              </div>
+            </section>
+
+            {/* ── CARD 2 : Vital Signs ──────────────────── */}
+            <section className={`${CARD} p-6`}>
+              <div className="flex items-center gap-2.5 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <h2 className="text-sm font-semibold text-gray-900">Vital Signs</h2>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Left Eye</label>
-                <select
-                  value={formData.assessment.leftEye}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, leftEye: e.target.value },
-                    })
-                  }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select</option>
-                  <option value="6/3">6/3</option>
-                  <option value="6/3.8">6/3.8</option>
-                  <option value="6/4.8">6/4.8</option>
-                  <option value="6/6">6/6</option>
-                  <option value="6/7.5">6/7.5</option>
-                  <option value="6/9.5">6/9.5</option>
-                  <option value="6/12">6/12</option>
-                  <option value="6/15">6/15</option>
-                  <option value="6/19">6/19</option>
-                  <option value="6/24">6/24</option>
-                  <option value="6/30">6/30</option>
-                  <option value="6/38">6/38</option>
-                  <option value="6/48">6/48</option>
-                  <option value="6/60">6/60</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                {/* Temperature */}
+                <VitalCard icon={<Thermometer className="w-4 h-4" />} label="Temperature" unit="°C">
+                  <input type="number" step="0.1" value={formData.assessment.temperature} onChange={(e) => setAssessment('temperature', e.target.value)}
+                    className={INPUT} placeholder="36.5" />
+                </VitalCard>
+
+                {/* Blood Pressure */}
+                <VitalCard icon={<HeartPulse className="w-4 h-4" />} label="Blood Pressure" unit="mmHg">
+                  <div className="flex gap-2">
+                    <input type="number" placeholder="Sys" value={formData.assessment.bloodPressureSystolic} onChange={(e) => setAssessment('bloodPressureSystolic', e.target.value)} className={INPUT} />
+                    <span className="self-center text-gray-300">/</span>
+                    <input type="number" placeholder="Dia" value={formData.assessment.bloodPressureDiastolic} onChange={(e) => setAssessment('bloodPressureDiastolic', e.target.value)} className={INPUT} />
+                  </div>
+                </VitalCard>
+
+                {/* Heart Rate */}
+                <VitalCard icon={<HeartPulse className="w-4 h-4" />} label="Heart Rate" unit="bpm">
+                  <input type="number" value={formData.assessment.heartRate} onChange={(e) => setAssessment('heartRate', e.target.value)} className={INPUT} placeholder="80" />
+                </VitalCard>
+
+                {/* Respiratory Rate */}
+                <VitalCard icon={<Wind className="w-4 h-4" />} label="Respiratory Rate" unit="/min">
+                  <input type="number" value={formData.assessment.respiratoryRate} onChange={(e) => setAssessment('respiratoryRate', e.target.value)} className={INPUT} placeholder="18" />
+                </VitalCard>
+
+                {/* O₂ Saturation */}
+                <VitalCard icon={<Droplets className="w-4 h-4" />} label="Oxygen Saturation" unit="%">
+                  <input type="number" step="0.1" value={formData.assessment.oxygenSaturation} onChange={(e) => setAssessment('oxygenSaturation', e.target.value)} className={INPUT} placeholder="98" />
+                </VitalCard>
+
+                {/* Height / Weight */}
+                <VitalCard icon={<Ruler className="w-4 h-4" />} label="Height / Weight" unit="cm · kg">
+                  <div className="flex gap-2">
+                    <input type="number" step="0.1" placeholder="Height" value={formData.assessment.height} onChange={(e) => setAssessment('height', e.target.value)} className={INPUT} />
+                    <input type="number" step="0.1" placeholder="Weight" value={formData.assessment.weight} onChange={(e) => setAssessment('weight', e.target.value)} className={INPUT} />
+                  </div>
+                </VitalCard>
+              </div>
+            </section>
+
+            {/* ── CARD 3 : Assessment & Clinical Notes ──── */}
+            <section className={`${CARD} p-6 space-y-6`}>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                  <Stethoscope className="w-4 h-4" />
+                </div>
+                <h2 className="text-sm font-semibold text-gray-900">Assessment &amp; Clinical Notes</h2>
               </div>
 
+              {/* Chief Complaint (expanded) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">Right Eye (with Correction)</label>
-                <select
-                  value={formData.assessment.rightEyeWithCorrection}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, rightEyeWithCorrection: e.target.value },
-                    })
-                  }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select</option>
-                  <option value="6/3">6/3</option>
-                  <option value="6/3.8">6/3.8</option>
-                  <option value="6/4.8">6/4.8</option>
-                  <option value="6/6">6/6</option>
-                  <option value="6/7.5">6/7.5</option>
-                  <option value="6/9.5">6/9.5</option>
-                  <option value="6/12">6/12</option>
-                  <option value="6/15">6/15</option>
-                  <option value="6/19">6/19</option>
-                  <option value="6/24">6/24</option>
-                  <option value="6/30">6/30</option>
-                  <option value="6/38">6/38</option>
-                  <option value="6/48">6/48</option>
-                  <option value="6/60">6/60</option>
-                </select>
+                <label className={LABEL}>Detailed Complaint</label>
+                <textarea rows={3} value={formData.chiefComplaint}
+                  onChange={(e) => setFormData({ ...formData, chiefComplaint: e.target.value })}
+                  placeholder="Describe the primary reason for today's visit…"
+                  className={`${INPUT} resize-none`} />
+                <div className="mt-2.5 flex flex-wrap gap-2">
+                  {['Headache','Fever','Abdominal pain','Injury during sports','Respiratory symptoms','Nausea / Vomiting','Dizziness'].map((chip) => (
+                    <button key={chip} type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, chiefComplaint: prev.chiefComplaint ? `${prev.chiefComplaint.trim()}${prev.chiefComplaint.trim().endsWith('.') ? '' : '.'} ${chip}` : chip }))}
+                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200/80 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-700 transition-colors">
+                      <span className="text-[10px]">+</span>{chip}
+                    </button>
+                  ))}
+                </div>
               </div>
 
+              {/* Pain Scale */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">Left Eye (with Correction)</label>
-                <select
-                  value={formData.assessment.leftEyeWithCorrection}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, leftEyeWithCorrection: e.target.value },
-                    })
-                  }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select</option>
-                  <option value="6/3">6/3</option>
-                  <option value="6/3.8">6/3.8</option>
-                  <option value="6/4.8">6/4.8</option>
-                  <option value="6/6">6/6</option>
-                  <option value="6/7.5">6/7.5</option>
-                  <option value="6/9.5">6/9.5</option>
-                  <option value="6/12">6/12</option>
-                  <option value="6/15">6/15</option>
-                  <option value="6/19">6/19</option>
-                  <option value="6/24">6/24</option>
-                  <option value="6/30">6/30</option>
-                  <option value="6/38">6/38</option>
-                  <option value="6/48">6/48</option>
-                  <option value="6/60">6/60</option>
-                </select>
+                <label className={LABEL}>Pain Scale</label>
+                <p className="text-[11px] text-slate-400 mb-2">Tap the face that best matches the patient&apos;s pain level.</p>
+                <PainScaleSelector
+                  value={formData.assessment.painScale}
+                  onChange={(score) => setAssessment('painScale', score.toString())}
+                />
               </div>
 
+              {/* Diagnosis */}
               <div>
-                <label className="block text-sm font-medium text-gray-700">Vision Screening Result</label>
-                <select
-                  value={formData.assessment.visionScreeningResult}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      assessment: { ...formData.assessment, visionScreeningResult: e.target.value },
-                    })
-                  }
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select</option>
-                  <option value="Normal">Normal</option>
-                  <option value="Abnormal">Abnormal</option>
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className={LABEL}>Diagnosis</label>
+                  <select className="rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-xs text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                    defaultValue=""
+                    onChange={(e) => { if (!e.target.value) return; setFormData((p) => ({ ...p, diagnosis: p.diagnosis ? `${p.diagnosis}\n${e.target.value}` : e.target.value })); }}>
+                    <option value="">Common diagnoses…</option>
+                    <option value="Upper respiratory tract infection">Upper respiratory tract infection</option>
+                    <option value="Viral fever">Viral fever</option>
+                    <option value="Tension-type headache">Tension-type headache</option>
+                    <option value="Minor musculoskeletal injury">Minor musculoskeletal injury</option>
+                    <option value="Allergic reaction">Allergic reaction</option>
+                  </select>
+                </div>
+                <textarea value={formData.diagnosis} onChange={(e) => setFormData({ ...formData, diagnosis: e.target.value })} rows={3} className={`${INPUT} resize-none`} placeholder="Enter diagnosis…" />
               </div>
-            </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <input
-              type="checkbox"
-              checked={formData.followUpRequired}
-              onChange={(e) => setFormData({ ...formData, followUpRequired: e.target.checked })}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label className="ml-2 block text-sm text-gray-900">Follow-up required</label>
-            {formData.followUpRequired && (
-              <input
-                type="date"
-                value={formData.followUpDate}
-                onChange={(e) => setFormData({ ...formData, followUpDate: e.target.value })}
-                className="border border-slate-200 rounded-md shadow-sm py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            )}
-          </div>
+              {/* Plan / Treatment */}
+              <div>
+                <label className={LABEL}>Plan / Treatment</label>
+                <textarea value={formData.treatment} onChange={(e) => setFormData({ ...formData, treatment: e.target.value })} rows={3} className={`${INPUT} resize-none`} placeholder="Describe treatment plan…" />
+              </div>
 
-          <div className="border-t border-gray-200 pt-4">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={formData.notifyParent}
-                onChange={(e) => setFormData({ ...formData, notifyParent: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label className="ml-2 block text-sm text-gray-900">
-                Send notification email to parent
-              </label>
-            </div>
-            {formData.notifyParent && (
-              <p className="mt-2 text-sm text-gray-500">
-                An email with visit details and summary report will be sent to the student's parent email address.
-              </p>
-            )}
-          </div>
+              {/* Notes */}
+              <div>
+                <label className={LABEL}>Additional Notes</label>
+                <textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={2} className={`${INPUT} resize-none`} placeholder="Any other observations…" />
+              </div>
+            </section>
 
-          <div className="flex justify-end space-x-3 pt-2">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {loading ? 'Creating...' : 'Create Visit'}
-            </button>
-          </div>
-        </form>
-          </div>
+            {/* ── CARD 4 : Vision & Health Record ───────── */}
+            <section className={`${CARD} p-6`}>
+              <div className="flex items-center gap-2.5 mb-1">
+                <div className="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center">
+                  <Eye className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-900">Vision &amp; Health Record</h2>
+                  <p className="text-[11px] text-slate-400">Auto-populated from latest health record. Modify if needed.</p>
+                </div>
+              </div>
 
-          {/* Patient Snapshot Sidebar */}
-          <div className="lg:col-span-1 space-y-4 lg:sticky lg:top-20">
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-              <div className="flex items-start justify-between mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-5">
+                <div>
+                  <label className={LABEL}>Color Blindness</label>
+                  <select value={formData.assessment.colorBlindness} onChange={(e) => setAssessment('colorBlindness', e.target.value)} className={SELECT}>
+                    <option value="">Select</option><option value="Normal">Normal</option><option value="Abnormal">Abnormal</option>
+                  </select>
+                </div>
+                <div>
+                  <label className={LABEL}>Vision Testing Performed</label>
+                  <select value={formData.assessment.visionTestingPerformed} onChange={(e) => setAssessment('visionTestingPerformed', e.target.value)} className={SELECT}>
+                    <option value="">Select</option><option value="true">Yes</option><option value="false">No</option>
+                  </select>
+                </div>
+                {formData.assessment.visionTestingPerformed === 'false' && (
+                  <div className="sm:col-span-2">
+                    <label className={LABEL}>Reason Not Performed</label>
+                    <input type="text" value={formData.assessment.visionTestingNotPerformedReason} onChange={(e) => setAssessment('visionTestingNotPerformedReason', e.target.value)} className={INPUT} />
+                  </div>
+                )}
+                <div>
+                  <label className={LABEL}>Corrective Lenses</label>
+                  <select value={formData.assessment.correctiveLenses} onChange={(e) => setAssessment('correctiveLenses', e.target.value)} className={SELECT}>
+                    <option value="">Select</option><option value="None">None</option><option value="Glasses">Glasses</option><option value="Contact lenses">Contact lenses</option><option value="Surgical correction">Surgical correction</option><option value="Other">Other</option>
+                  </select>
+                </div>
+                {formData.assessment.correctiveLenses === 'Other' && (
+                  <div>
+                    <label className={LABEL}>Other Reason</label>
+                    <input type="text" value={formData.assessment.correctiveLensesOtherReason} onChange={(e) => setAssessment('correctiveLensesOtherReason', e.target.value)} className={INPUT} />
+                  </div>
+                )}
+
+                {/* Eye acuity (4 selects) */}
+                {([
+                  ['rightEye', 'Right Eye'],
+                  ['leftEye', 'Left Eye'],
+                  ['rightEyeWithCorrection', 'Right Eye (Correction)'],
+                  ['leftEyeWithCorrection', 'Left Eye (Correction)'],
+                ] as const).map(([key, lbl]) => (
+                  <div key={key}>
+                    <label className={LABEL}>{lbl}</label>
+                    <select value={(formData.assessment as any)[key]} onChange={(e) => setAssessment(key, e.target.value)} className={SELECT}>
+                      <option value="">Select</option>
+                      {ACUITY.map((v) => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  </div>
+                ))}
+
+                <div>
+                  <label className={LABEL}>Vision Screening Result</label>
+                  <select value={formData.assessment.visionScreeningResult} onChange={(e) => setAssessment('visionScreeningResult', e.target.value)} className={SELECT}>
+                    <option value="">Select</option><option value="Normal">Normal</option><option value="Abnormal">Abnormal</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            {/* ── Follow-up & Notify (inline) ───────────── */}
+            <section className={`${CARD} p-6 space-y-4`}>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formData.followUpRequired} onChange={(e) => setFormData({ ...formData, followUpRequired: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <span className="text-sm font-medium text-gray-700">Follow-up required</span>
+                </label>
+                {formData.followUpRequired && (
+                  <input type="date" value={formData.followUpDate} onChange={(e) => setFormData({ ...formData, followUpDate: e.target.value })} className={`${INPUT} w-auto`} />
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formData.notifyParent} onChange={(e) => setFormData({ ...formData, notifyParent: e.target.checked })}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <span className="text-sm font-medium text-gray-700">Send notification email to parent</span>
+                </label>
+                {formData.notifyParent && (
+                  <p className="text-xs text-slate-400">An email with visit details will be sent to the student&apos;s parent.</p>
+                )}
+              </div>
+            </section>
+          </form>
+
+          {/* ════════════════ RIGHT COLUMN — SIDEBAR ═══════ */}
+          <aside className="space-y-5 lg:sticky lg:top-20">
+
+            {/* Patient Snapshot */}
+            <div className={`${CARD} p-5`}>
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Stethoscope className="w-4 h-4" />
+                </div>
                 <div>
                   <h2 className="text-sm font-semibold text-gray-900">Patient Snapshot</h2>
-                  <p className="text-[11px] text-slate-500">Allergies, conditions &amp; quick history</p>
+                  <p className="text-[11px] text-slate-400">Allergies, conditions &amp; quick history</p>
                 </div>
               </div>
 
-              {/* Allergies card */}
-              <div
-                className={`rounded-xl border px-3.5 py-3 mb-3 ${
-                  studentSummary?.healthSummary?.allergies &&
-                  studentSummary.healthSummary.allergies !== 'None recorded'
-                    ? 'border-rose-200 bg-rose-50/70'
-                    : 'border-slate-200 bg-slate-50/60'
-                }`}
-              >
-                <p className="text-xs font-semibold text-slate-700 mb-1">Allergies</p>
-                <p className="text-xs text-slate-700">
-                  {studentSummary?.healthSummary?.allergies || 'No allergies recorded'}
-                </p>
+              {/* Allergies */}
+              <div className={`rounded-xl border px-4 py-3 mb-4 ${
+                studentSummary?.healthSummary?.allergies && studentSummary.healthSummary.allergies !== 'None recorded'
+                  ? 'border-rose-200 bg-rose-50/70'
+                  : 'border-gray-200 bg-gray-50/60'
+              }`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <AlertTriangle className={`w-3.5 h-3.5 ${
+                    studentSummary?.healthSummary?.allergies && studentSummary.healthSummary.allergies !== 'None recorded' ? 'text-rose-500' : 'text-gray-400'
+                  }`} />
+                  <p className="text-xs font-semibold text-slate-700">Allergies</p>
+                </div>
+                <p className="text-xs text-slate-600">{studentSummary?.healthSummary?.allergies || 'No allergies recorded'}</p>
               </div>
 
-              {/* Recent history timeline */}
-              <div>
-                <p className="text-xs font-semibold text-slate-700 mb-2">Recent History</p>
-                {formData.studentId ? (
-                  previousVisits.length === 0 && !loadingVisits ? (
-                    <p className="text-xs text-slate-400">No previous visits found</p>
-                  ) : (
-                    <ol className="relative border-l border-slate-200 space-y-3 max-h-[320px] overflow-y-auto">
-                      {previousVisits.slice(0, 3).map((visit) => (
-                        <li key={visit.id} className="ml-3 pl-3">
-                          <div className="absolute -left-1.5 mt-1 h-2.5 w-2.5 rounded-full bg-blue-500" />
-                          <button
-                            type="button"
-                            onClick={() => setSelectedVisit(visit)}
-                            className="w-full text-left"
-                          >
-                            <p className="text-[11px] font-semibold text-slate-700">
-                              {formatVisitType(visit.visitType)}
-                            </p>
-                            <p className="text-[10px] text-slate-400">{formatDate(visit.visitDate)}</p>
-                            {visit.chiefComplaint && (
-                              <p className="mt-0.5 text-[11px] text-slate-600 line-clamp-2">
-                                {visit.chiefComplaint}
-                              </p>
-                            )}
-                          </button>
-                        </li>
-                      ))}
-                      {loadingVisits && (
-                        <li className="ml-3 pl-3 text-[11px] text-slate-400">Loading history…</li>
-                      )}
-                    </ol>
-                  )
-                ) : (
-                  <p className="text-xs text-slate-400">Select a student to view history</p>
-                )}
+              {/* Chronic Conditions */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50/60 px-4 py-3 mb-4">
+                <p className="text-xs font-semibold text-slate-700 mb-1">Chronic Conditions</p>
+                <p className="text-xs text-slate-600">{studentSummary?.healthSummary?.chronicConditions || 'None recorded'}</p>
               </div>
+
+              {/* Medications */}
+              <div className="rounded-xl border border-gray-200 bg-gray-50/60 px-4 py-3 mb-4">
+                <p className="text-xs font-semibold text-slate-700 mb-1">Medications</p>
+                <p className="text-xs text-slate-600">{studentSummary?.healthSummary?.medications || 'None recorded'}</p>
+              </div>
+
+              {/* Stats row */}
+              {studentSummary?.statistics && (
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <div className="rounded-xl bg-blue-50 border border-blue-100 px-3 py-2.5 text-center">
+                    <p className="text-lg font-bold text-blue-700">{studentSummary.statistics.totalVisits ?? 0}</p>
+                    <p className="text-[10px] text-blue-500 font-medium">Total Visits</p>
+                  </div>
+                  <div className="rounded-xl bg-purple-50 border border-purple-100 px-3 py-2.5 text-center">
+                    <p className="text-lg font-bold text-purple-700">{studentSummary.student?.grade ?? '—'}</p>
+                    <p className="text-[10px] text-purple-500 font-medium">Grade</p>
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Visit Preview Modal */}
-            {selectedVisit && (
-              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                  <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Visit Details - {formatDate(selectedVisit.visitDate)}
-                    </h3>
-                    <button
-                      onClick={() => setSelectedVisit(null)}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                  <div className="p-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Visit Type</label>
-                        <p className="mt-1 text-sm text-gray-900">{formatVisitType(selectedVisit.visitType)}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Date</label>
-                        <p className="mt-1 text-sm text-gray-900">{formatDate(selectedVisit.visitDate)}</p>
-                      </div>
-                    </div>
-                    {selectedVisit.chiefComplaint && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Chief Complaint</label>
-                        <p className="mt-1 text-sm text-gray-900">{selectedVisit.chiefComplaint}</p>
-                      </div>
-                    )}
-                    {selectedVisit.diagnosis && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-700">Diagnosis</label>
-                        <p className="mt-1 text-sm text-gray-900">{selectedVisit.diagnosis}</p>
-                      </div>
-                    )}
-                    {selectedVisit.assessment && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-700 mb-2 block">Vital Signs</label>
-                        <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                          {selectedVisit.assessment.temperature && (
-                            <div>
-                              <span className="text-xs text-gray-600">Temperature:</span>
-                              <span className="ml-2 text-sm font-medium">{selectedVisit.assessment.temperature}°C</span>
-                            </div>
-                          )}
-                          {selectedVisit.assessment.bloodPressureSystolic && (
-                            <div>
-                              <span className="text-xs text-gray-600">Blood Pressure:</span>
-                              <span className="ml-2 text-sm font-medium">
-                                {selectedVisit.assessment.bloodPressureSystolic}/
-                                {selectedVisit.assessment.bloodPressureDiastolic || '--'} mmHg
-                              </span>
-                            </div>
-                          )}
-                          {selectedVisit.assessment.heartRate && (
-                            <div>
-                              <span className="text-xs text-gray-600">Heart Rate:</span>
-                              <span className="ml-2 text-sm font-medium">{selectedVisit.assessment.heartRate} bpm</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    <div>
-                      <label className="text-sm font-medium text-gray-700">Created By</label>
-                      <p className="mt-1 text-sm text-gray-900">
-                        {selectedVisit.creator.firstName} {selectedVisit.creator.lastName}
-                      </p>
-                    </div>
-                  </div>
+            {/* Recent History */}
+            <div className={`${CARD} p-5`}>
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Clock className="w-4 h-4" />
                 </div>
+                <h2 className="text-sm font-semibold text-gray-900">Recent History</h2>
               </div>
-            )}
+
+              {formData.studentId ? (
+                previousVisits.length === 0 && !loadingVisits ? (
+                  <p className="text-xs text-slate-400 text-center py-4">No previous visits found</p>
+                ) : (
+                  <ol className="relative border-l-2 border-gray-200 space-y-4 ml-2 max-h-[360px] overflow-y-auto pr-1">
+                    {previousVisits.slice(0, 5).map((visit) => (
+                      <li key={visit.id} className="ml-4 relative">
+                        <span className="absolute -left-[22px] top-1.5 w-3 h-3 rounded-full bg-blue-500 border-2 border-white" />
+                        <button type="button" onClick={() => setSelectedVisit(visit)} className="w-full text-left group">
+                          <p className="text-xs font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+                            {formatVisitType(visit.visitType)}
+                          </p>
+                          <p className="text-[10px] text-slate-400">{formatDate(visit.visitDate)}</p>
+                          {visit.chiefComplaint && (
+                            <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2">{visit.chiefComplaint}</p>
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                    {loadingVisits && <li className="ml-4 text-[11px] text-slate-400">Loading…</li>}
+                  </ol>
+                )
+              ) : (
+                <p className="text-xs text-slate-400 text-center py-4">Select a student to view history</p>
+              )}
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      {/* ── Fixed Footer Bar ────────────────────────────── */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/80 backdrop-blur-lg border-t border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-4">
+          <p className="hidden sm:block text-xs text-slate-400">
+            {selectedStudent
+              ? `Creating assessment for ${selectedStudent.firstName} ${selectedStudent.lastName}`
+              : 'Select a student to begin'}
+          </p>
+          <div className="flex items-center gap-3 ml-auto">
+            <button type="button" onClick={() => router.back()}
+              className="px-5 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" form="assessment-form" disabled={loading}
+              className="px-6 py-2.5 rounded-xl bg-blue-600 text-sm font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60 transition-colors">
+              {loading ? 'Saving…' : 'Save Assessment'}
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Floating Save Assessment button */}
-      <button
-        type="submit"
-        form="assessment-form"
-        disabled={loading}
-        className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60"
-      >
-        {loading ? 'Saving…' : 'Save Assessment'}
-      </button>
+      {/* ── Visit Preview Modal ─────────────────────────── */}
+      {selectedVisit && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white/90 backdrop-blur border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-base font-semibold text-gray-900">
+                Visit — {formatDate(selectedVisit.visitDate)}
+              </h3>
+              <button onClick={() => setSelectedVisit(null)}
+                className="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                <X className="w-4 h-4 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-[11px] font-semibold text-slate-400 uppercase mb-1">Visit Type</p><p className="text-sm text-gray-900">{formatVisitType(selectedVisit.visitType)}</p></div>
+                <div><p className="text-[11px] font-semibold text-slate-400 uppercase mb-1">Date</p><p className="text-sm text-gray-900">{formatDate(selectedVisit.visitDate)}</p></div>
+              </div>
+              {selectedVisit.chiefComplaint && (
+                <div><p className="text-[11px] font-semibold text-slate-400 uppercase mb-1">Chief Complaint</p><p className="text-sm text-gray-900">{selectedVisit.chiefComplaint}</p></div>
+              )}
+              {selectedVisit.diagnosis && (
+                <div><p className="text-[11px] font-semibold text-slate-400 uppercase mb-1">Diagnosis</p><p className="text-sm text-gray-900">{selectedVisit.diagnosis}</p></div>
+              )}
+              {selectedVisit.assessment && (
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase mb-2">Vital Signs</p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {selectedVisit.assessment.temperature && (
+                      <div className="rounded-xl bg-slate-50 p-3 text-center">
+                        <p className="text-lg font-bold text-gray-900">{selectedVisit.assessment.temperature}°C</p>
+                        <p className="text-[10px] text-slate-400">Temperature</p>
+                      </div>
+                    )}
+                    {selectedVisit.assessment.bloodPressureSystolic && (
+                      <div className="rounded-xl bg-slate-50 p-3 text-center">
+                        <p className="text-lg font-bold text-gray-900">{selectedVisit.assessment.bloodPressureSystolic}/{selectedVisit.assessment.bloodPressureDiastolic || '—'}</p>
+                        <p className="text-[10px] text-slate-400">BP mmHg</p>
+                      </div>
+                    )}
+                    {selectedVisit.assessment.heartRate && (
+                      <div className="rounded-xl bg-slate-50 p-3 text-center">
+                        <p className="text-lg font-bold text-gray-900">{selectedVisit.assessment.heartRate}</p>
+                        <p className="text-[10px] text-slate-400">Heart Rate bpm</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              <div>
+                <p className="text-[11px] font-semibold text-slate-400 uppercase mb-1">Created By</p>
+                <p className="text-sm text-gray-900">{selectedVisit.creator.firstName} {selectedVisit.creator.lastName}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
 
+/* ── Sub-component: Vital Card ─────────────────────────── */
+function VitalCard({ icon, label, unit, children }: { icon: React.ReactNode; label: string; unit: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-gray-200/80 bg-gray-50/40 p-3.5">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-slate-400">{icon}</span>
+        <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
+        <span className="ml-auto text-[10px] text-slate-400 font-medium">{unit}</span>
+      </div>
+      {children}
+    </div>
+  );
+}

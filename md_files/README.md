@@ -12,14 +12,21 @@ md_files/
 │   └── PRODUCTION.md          # Production deployment guide
 ├── security/
 │   ├── SECURITY.md            # Comprehensive security implementation documentation
-│   └── COMPLIANCE.md          # Security compliance checklist
+│   ├── COMPLIANCE.md          # Security compliance checklist
+│   └── ENCRYPTION.md          # Encryption implementation details
 ├── features/
 │   ├── ADMIN_DASHBOARD.md     # Admin dashboard implementation details
 │   └── UI_DESIGN.md           # UI design and sidebar navigation documentation
 ├── requirements/
 │   └── REQUIREMENTS_ANALYSIS.md # Requirements analysis vs. implementation
-└── development/
-    └── SIDEBAR_DESIGN.md      # Sidebar design specifications
+├── development/
+│   └── SIDEBAR_DESIGN.md      # Sidebar design specifications
+└── system-design/              # ★ System design & architecture documentation
+    ├── UI_DESIGN.md            # Complete UI design system (tokens, components, pages)
+    ├── ARCHITECTURE.md         # System architecture, directory structure, request flow
+    ├── API.md                  # Full API reference (all endpoints, auth, RBAC)
+    ├── BACKEND.md              # Backend design (libraries, security, process management)
+    └── DATABASE.md             # Database schema (18 models, enums, indexes, data flows)
 ```
 
 ## 📚 Documentation Categories
@@ -62,6 +69,13 @@ md_files/
 ### For Development
 - Sidebar design: See `development/SIDEBAR_DESIGN.md`
 
+### For System Design & Architecture
+- UI design system (tokens, components, pages): See `system-design/UI_DESIGN.md`
+- System architecture & directory structure: See `system-design/ARCHITECTURE.md`
+- Full API reference (all endpoints): See `system-design/API.md`
+- Backend design (libraries, security, PM2): See `system-design/BACKEND.md`
+- Database schema (models, enums, flows): See `system-design/DATABASE.md`
+
 ## 📝 Document Maintenance
 
 All documentation files in this folder are maintained and updated as the system evolves. When creating new documentation:
@@ -97,6 +111,6 @@ This documentation structure is designed to:
 
 ---
 
-**Last Updated**: 2024-12-17
+**Last Updated**: 2026-02-13
 **Maintained By**: Development Team
 
